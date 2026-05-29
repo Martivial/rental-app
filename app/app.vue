@@ -1,13 +1,14 @@
 <template>
+  <!-- GŁÓWNY KONTENER APLIKACJI -->
   <div v-if="user || isGuestMode" class="h-screen w-full flex flex-col bg-slate-50 overflow-hidden font-sans relative">
     
-    <header class="hidden md:flex h-16 bg-white border-b px-6 items-center justify-between z-30 shadow-sm">
-      <div class="flex items-center gap-2">
-        <div class="bg-green-600 p-1.5 rounded-lg text-white">🛠️</div>
-        <h1 class="font-bold text-xl tracking-tight text-slate-800">Sąsiedzka Pożyczalnia</h1>
+    <header class="h-16 bg-white border-b px-4 md:px-6 flex items-center justify-between z-30 shadow-sm flex-shrink-0 relative">
+      <div class="flex items-center gap-2 mx-auto md:mx-0 font-bold text-lg md:text-xl tracking-tight text-slate-800">
+        <div class="bg-green-600 p-1.5 rounded-lg text-white text-sm md:text-base">🛠️</div>
+        <span>Sąsiedzka Pożyczalnia</span>
       </div>
       
-      <nav class="flex items-center gap-6 text-sm font-semibold text-slate-600">
+      <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
         <span v-if="user" class="text-xs text-slate-400 font-normal">Zalogowany jako: {{ user?.email }}</span>
         <button @click="viewMode = 'all'" :class="viewMode === 'all' ? 'text-green-600' : 'hover:text-green-600 transition'">Przeglądaj</button>
         <template v-if="user">
@@ -20,77 +21,95 @@
 
     <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
       
-      <aside :class="[
-        'bg-white shadow-xl z-20 flex flex-col overflow-hidden transition-all duration-300',
-        'fixed bottom-0 left-0 right-0 h-[45vh] rounded-t-3xl md:relative md:h-full md:w-96 md:rounded-none md:order-2',
-        mobileView === 'map' ? 'translate-y-full md:translate-y-0' : 'translate-y-0'
-      ]">
-        <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3 md:hidden"></div>
+      <main class="w-full h-[40vh] md:h-full md:flex-1 relative z-0 border-b md:border-b-0 md:border-r border-slate-200">
+        <ClientOnly>
+          <!-- POPRAWKA 1: Podpięty prop :center, który przekazuje wybraną lokalizację do komponentu mapy -->
+          <TheMap :items="items || []" :center="mapCenter" @map-click="handleMapClick" />
+        </ClientOnly>
+        
+        <!-- POPRAWKA 2: Dodane @click="goToMyLocation", żeby przycisk w końcu reagował na kliknięcie -->
+        <div @click="goToMyLocation" class="absolute bottom-4 left-4 z-[1000] bg-white px-3 py-1.5 rounded-xl shadow-md border border-green-500/20 flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition active:scale-95 select-none">
+          <div class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          </div>
+          <span class="text-[11px] font-bold text-slate-700">Twoja lokalizacja</span>
+        </div>
+      </main>
 
-        <div class="p-4 border-b pt-0 md:pt-4">
-          <h2 class="font-bold text-base md:text-lg text-slate-800">Narzędzia w okolicy</h2>
-          <div class="mt-2 relative">
-            <input type="text" placeholder="Szukaj narzędzi..." class="w-full bg-slate-100 border-none rounded-xl py-2 px-4 pl-10 focus:ring-2 focus:ring-green-500 outline-none text-sm" />
-            <span class="absolute left-3 top-2.5 text-slate-400">🔍</span>
+      <aside class="w-full flex-1 md:flex-none md:w-96 bg-white flex flex-col overflow-hidden shadow-inner md:shadow-xl z-10 relative">
+        <div class="p-4 border-b bg-white flex-shrink-0">
+          <h2 class="font-bold text-base text-slate-800 hidden md:block">Narzędzia w okolicy</h2>
+          <div class="relative mt-0 md:mt-2">
+            <input type="text" placeholder="Szukaj narzędzi w okolicy..." class="w-full bg-slate-100 border-none rounded-xl py-2.5 px-4 pl-10 focus:ring-2 focus:ring-green-500 outline-none text-sm" />
+            <span class="absolute left-3 top-3 text-slate-400 text-sm">🔍</span>
           </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-24 md:pb-4">
+        <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-20 md:pb-4 bg-slate-50/50">
           <div v-if="pending" class="text-center py-8 flex flex-col items-center gap-2 text-slate-400 text-sm">
             <div class="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
             <p>Wczytywanie ogłoszeń...</p>
           </div>
 
           <template v-else>
-            <div v-for="item in items" :key="item.id" class="bg-white border rounded-2xl p-3 shadow-sm border-slate-100">
+            <div v-for="item in items" :key="item.id" class="bg-white border border-slate-100 rounded-2xl p-3 shadow-sm hover:border-green-100 transition">
               <div class="flex gap-3">
-                <div class="w-20 h-20 bg-slate-200 rounded-xl flex items-center justify-center text-slate-400 flex-shrink-0">📷</div>
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-bold text-sm text-slate-800 truncate">{{ item.name }}</h3>
-                  <p class="text-green-600 font-bold text-xs">25 zł/dzień</p>
+                <div class="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 flex-shrink-0 text-lg">📷</div>
+                <div class="flex-1 min-w-0 flex flex-col justify-between">
+                  <div>
+                    <h3 class="font-bold text-sm text-slate-800 truncate">{{ item.name }}</h3>
+                    <p class="text-green-600 font-extrabold text-xs mt-0.5">opis</p>
+                  </div>
                   <div class="flex items-center justify-between mt-2">
-                     <span class="text-[11px] text-slate-400">📍 350m</span>
-                     <button @click="handleReserveClick" class="bg-green-600 text-white text-[10px] px-2.5 py-1.5 rounded-lg font-bold uppercase">Rezerwuj</button>
+                     <span class="text-[11px] text-slate-400">📍 350m stąd</span>
+                     <button @click="handleReserveClick" class="bg-green-600 hover:bg-green-700 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider transition">Rezerwuj</button>
                   </div>
                 </div>
               </div>
+            </div>
+            
+            <div v-if="!items || items.length === 0" class="text-center text-slate-400 text-sm py-12">
+              Brak narzędzi w tej okolicy.
             </div>
           </template>
         </div>
       </aside>
 
-      <main class="flex-1 h-full w-full relative md:order-1">
-        <ClientOnly>
-          <TheMap :items="items || []" @map-click="handleMapClick" />
-        </ClientOnly>
-      </main>
-
     </div>
 
-    <div class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t flex items-center justify-around z-30 px-6 shadow-lg">
-      <button @click="mobileView = 'map'" :class="['flex flex-col items-center gap-1 text-xs font-bold', mobileView === 'map' ? 'text-green-600' : 'text-slate-400']">
-        <span>🗺️</span> <span>Mapa</span>
+    <nav class="md:hidden h-16 bg-white border-t border-slate-200 flex items-center justify-around z-30 px-4 shadow-lg flex-shrink-0">
+      <button @click="viewMode = 'all'" :class="['flex flex-col items-center gap-0.5 text-[11px] font-bold transition', viewMode === 'all' ? 'text-green-600' : 'text-slate-400']">
+        <span class="text-lg">🔍</span>
+        <span>Przeglądaj</span>
       </button>
-      <button @click="mobileView = 'list'" :class="['flex flex-col items-center gap-1 text-xs font-bold', mobileView === 'list' ? 'text-green-600' : 'text-slate-400']">
-        <span>📋</span> <span>Lista</span>
+      
+      <template v-if="user">
+        <button @click="showDashboard = true" class="flex flex-col items-center gap-0.5 text-[11px] font-bold text-slate-400">
+          <span class="text-lg">👤</span>
+          <span>Mój Panel</span>
+        </button>
+        <button @click="logout" class="flex flex-col items-center gap-0.5 text-[11px] font-bold text-red-500">
+          <span class="text-lg">🚪</span>
+          <span>Wyloguj</span>
+        </button>
+      </template>
+      
+      <button v-else @click="isGuestMode = false" class="flex flex-col items-center gap-0.5 text-[11px] font-bold text-green-600">
+        <span class="text-lg">🔑</span>
+        <span>Zaloguj się</span>
       </button>
-      <button v-if="user" @click="showDashboard = true" class="flex flex-col items-center gap-1 text-xs font-bold text-slate-400">
-        <span>👤</span> <span>Panel</span>
-      </button>
-      <button v-else @click="isGuestMode = false" class="flex flex-col items-center gap-1 text-xs font-bold text-green-600">
-        <span>🔑</span> <span>Zaloguj</span>
-      </button>
-    </div>
+    </nav>
 
     <div v-if="showModal" class="fixed inset-0 flex items-end md:items-center justify-center z-[9999] p-0 md:p-4 bg-slate-900/40 backdrop-blur-sm">
       <div class="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up">
-        <h2 class="text-xl md:text-2xl font-bold mb-4">Dodaj nowe ogłoszenie</h2>
+        <h2 class="text-xl md:text-2xl font-bold mb-4 text-slate-800">Dodaj nowe ogłoszenie</h2>
         <div class="space-y-4">
-          <input v-model="newItem.name" placeholder="Nazwa narzędzia" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
-          <input v-model="newItem.category" placeholder="Kategoria" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
-          <div class="flex gap-2 pt-2">
-            <button @click="saveItem" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold text-sm">Opublikuj</button>
-            <button @click="showModal = false" class="px-6 bg-slate-100 py-3 rounded-xl font-bold text-sm">Anuluj</button>
+          <input v-model="newItem.name" placeholder="Nazwa narzędzia (np. Wiertarka Udarowa)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+          <input v-model="newItem.category" placeholder="Kategoria (np. Elektronarzędzia)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+          <div class="flex gap-3 pt-2">
+            <button @click="saveItem" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-sm transition">Opublikuj</button>
+            <button @click="showModal = false" class="px-6 bg-slate-100 hover:bg-slate-200 py-3 rounded-xl font-bold text-sm text-slate-600 transition">Anuluj</button>
           </div>
         </div>
       </div>
@@ -116,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watchEffect } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const client = useSupabaseClient()
 const user = useSupabaseUser() 
@@ -125,8 +144,10 @@ const showDashboard = ref(false)
 const showModal = ref(false)
 const isGuestMode = ref(false)
 const viewMode = ref('all')
-const mobileView = ref('map') // 'map' lub 'list' - sterowanie widokiem na telefonie
 const newItem = ref({ name: '', category: '', description: '', lat: null, lng: null })
+
+// POPRAWKA 3: Dodajemy reaktywną zmienną przechowującą aktualny środek mapy
+const mapCenter = ref(null)
 
 const { data: items, refresh, pending } = await useLazyAsyncData('items', async () => {
   const { data } = await client.from('items').select('*')
@@ -139,7 +160,33 @@ const myItemsOnly = computed(() => {
   return items.value.filter(item => String(item.user_id).trim() === String(currentUserId).trim())
 })
 
+function initAutomaticLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // Jeśli użytkownik pozwoli na GPS, zapisujemy jego pozycję
+        mapCenter.value = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+      },
+      (error) => {
+        // Jeśli odmówi lub wystąpi błąd, nie robimy nic (zostanie domyślna Warszawa)
+        console.log("Automatyczna lokalizacja niedostępna, ładowanie domyślnego widoku.");
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 5000, // Czekaj maksymalnie 5 sekund na GPS
+        maximumAge: 60000
+      }
+    )
+  }
+}
+
 onMounted(async () => {
+  // Uruchamiamy automatyczne sprawdzanie lokalizacji zaraz po włączeniu apki
+  initAutomaticLocation()
+
   const { data: { session } } = await client.auth.getSession()
   if (session?.user) user.value = session.user
 
@@ -153,6 +200,33 @@ onMounted(async () => {
     refresh()
   })
 })
+
+// POPRAWKA 4: Dodajemy funkcję geolokalizacji, która pyta system i aktualizuje mapCenter
+function goToMyLocation() {
+  if (!navigator.geolocation) {
+    alert("Geolokalizacja nie jest wspierana przez Twoją przeglądarkę.")
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // Przepisujemy współrzędne z GPS urządzenia do zmiennej mapCenter
+      mapCenter.value = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      }
+    },
+    (error) => {
+      alert("Nie udało się pobrać lokalizacji. Sprawdź uprawnienia strony.")
+      console.error(error)
+    },
+    {
+      enableHighAccuracy: false, // Bezpieczny tryb dla localhost / środowiska testowego
+      timeout: 10000,
+      maximumAge: 60000
+    }
+  )
+}
 
 function handleMapClick(coords) {
   if (!user.value) return 
@@ -205,7 +279,6 @@ async function deleteItem(id) {
 </script>
 
 <style scoped>
-/* Płynne wysuwanie modali na telefonie */
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
