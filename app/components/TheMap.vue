@@ -3,15 +3,16 @@
     <div id="map-container" class="w-full h-full rounded-[2rem] shadow-inner overflow-hidden border-8 border-white"></div>
   </div>
 </template>
+
 <script setup>
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, nextTick } from 'vue'
 
 const props = defineProps(['items', 'center'])
-const emit = defineEmits(['map-click'])
+// 1. DODAŁEM 'marker-click' DO EMITÓW
+const emit = defineEmits(['map-click', 'marker-click'])
 
 onMounted(async () => {
   const L = await import('leaflet')
- 
   await import('leaflet/dist/leaflet.css')
 
   const startLat = props.center?.lat || 52.23
@@ -20,24 +21,31 @@ onMounted(async () => {
 
   const map = L.map('map-container', {
     zoomControl: false,
-    attributionControl: false
+    attributionControl: false,
+    preferCanvas: true
   }).setView([startLat, startLng], startZoom)
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     maxZoom: 20
   }).addTo(map)
 
-  // Grupa na ogłoszenia sąsiadów
+  setTimeout(() => {
+    map.invalidateSize()
+  }, 200)
+
   const markerGroup = L.layerGroup().addTo(map)
-  
-  // POPRAWKA 1: Tworzymy osobną grupę tylko na marker użytkownika "Tu jesteś"
   const userLocationGroup = L.layerGroup().addTo(map)
 
-  // LOGIKA RYSOWANIA PINEZEK SĄSIADÓW
   const drawMarkers = () => {
     markerGroup.clearLayers()
-    props.items?.forEach(item => {
-      if (item.lat && item.lng) {
+    
+    if (!props.items || props.items.length === 0) return
+
+    props.items.forEach(item => {
+      const lat = Number(item.lat)
+      const lng = Number(item.lng)
+
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
         const customIcon = L.divIcon({
           className: 'custom-div-icon',
           html: `
@@ -52,20 +60,18 @@ onMounted(async () => {
           iconAnchor: [50, 25]
         })
 
-        L.marker([item.lat, item.lng], { icon: customIcon })
+        // 2. DODAŁEM OBSŁUGĘ KLIKNIĘCIA W MARKER
+        L.marker([lat, lng], { icon: customIcon })
           .addTo(markerGroup)
-          .bindPopup(`<b>${item.name}</b>`)
+          .on('click', () => emit('marker-click', item))
       }
     })
   }
 
-  // POPRAWKA 2: Nowa funkcja, która rysuje niebieskiego ludzika na mapie
   const drawUserMarker = (coords) => {
-    userLocationGroup.clearLayers() // Czyścimy poprzednią pozycję ludzika
-
+    userLocationGroup.clearLayers()
     if (!coords || !coords.lat || !coords.lng) return
 
-    // Tworzymy ikonę niebieskiego ludzika z napisem "Tu jesteś" za pomocą Tailwinda
     const userIcon = L.divIcon({
       className: 'custom-div-icon',
       html: `
@@ -82,33 +88,30 @@ onMounted(async () => {
         </div>
       `,
       iconSize: [100, 70],
-      iconAnchor: [50, 65] // Kotwica ustawiona tak, by dymek stał dokładnie na punkcie GPS
+      iconAnchor: [50, 65]
     })
 
-    // Stawiamy ludzika na mapie
-    L.marker([coords.lat, coords.lng], { icon: userIcon }).addTo(userLocationGroup)
+    L.marker([Number(coords.lat), Number(coords.lng)], { icon: userIcon }).addTo(userLocationGroup)
   }
 
-  // Rysujemy wszystko na starcie
   drawMarkers()
-  drawUserMarker(props.center) // Próba narysowania ludzika, jeśli od razu mamy GPS
+  drawUserMarker(props.center)
   
   watch(() => props.items, () => {
-    drawMarkers()
-  }, { deep: true })
+    nextTick(() => {
+      drawMarkers()
+      map.invalidateSize()
+    })
+  }, { deep: true, immediate: true })
 
-  // POPRAWKA 3: Aktualizujemy strażnika (watch). 
-  // Gdy GPS namierzy pozycję, nie tylko przesuwamy kamerę (flyTo), ale też rysujemy ludzika!
   watch(() => props.center, (newCenter) => {
     if (newCenter && newCenter.lat && newCenter.lng) {
-      // 1. Rysujemy ludzika w nowym miejscu
       drawUserMarker(newCenter)
-      
-      // 2. Lecimy tam kamerą
-      map.flyTo([newCenter.lat, newCenter.lng], 15, {
+      map.flyTo([Number(newCenter.lat), Number(newCenter.lng)], 15, {
         animate: true,
         duration: 1.5
       })
+      setTimeout(() => map.invalidateSize(), 1500)
     }
   }, { deep: true })
 

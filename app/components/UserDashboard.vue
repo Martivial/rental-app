@@ -1,164 +1,248 @@
 <template>
-<div class="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-[9999] flex flex-col font-sans border-l border-slate-100">    <div class="p-6 border-b flex justify-between items-center bg-slate-50">
-      <div>
-        <h2 class="text-xl font-bold text-slate-800">Panel Użytkownika</h2>
-        <p class="text-xs text-slate-400 mt-0.5">Zarządzaj swoimi przedmiotami i rezerwacjami</p>
-      </div>
-      <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-xl shadow-sm border w-9 h-9 flex items-center justify-center">✕</button>
-    </div>
-
-    <div class="flex border-b text-sm font-bold">
-      <button @click="activeTab = 'items'" 
-              :class="activeTab === 'items' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-400'"
-              class="flex-1 py-4 text-center transition">
-        Moje Przedmioty ({{ myItems.length }})
-      </button>
-      <button @click="activeTab = 'requests'" 
-              :class="activeTab === 'requests' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-400'"
-              class="flex-1 py-4 text-center transition">
-        Prośby od sąsiadów ({{ pendingRequests.length }})
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-6 space-y-6">
+  <div class="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex justify-end" @click="$emit('close')">
+    <div class="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-slide-left" @click.stop>
       
-      <div v-if="activeTab === 'items'" class="space-y-4">
-        <div v-for="item in myItems" :key="item.id" 
-             class="border border-slate-100 rounded-2xl p-4 bg-white shadow-sm flex gap-4 items-center justify-between">
-          <div class="flex gap-4 items-center">
-            <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-xl">🛠️</div>
-            <div>
-              <h4 class="font-bold text-slate-800 text-sm">{{ item.name }}</h4>
-              <p class="text-xs text-slate-400 uppercase font-semibold">{{ item.category || 'Inne' }}</p>
-            </div>
-          </div>
-          <button @click="$emit('delete-item', item.id)" 
-                  class="bg-red-50 hover:bg-red-100 text-red-500 p-2.5 rounded-xl transition">
-            🗑️
-          </button>
+      <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h2 class="text-xl font-black text-slate-800">Panel użytkownika</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Zarządzaj swoimi danymi i ogłoszeniami</p>
         </div>
-        <div v-if="myItems.length === 0" class="text-center text-slate-400 text-sm py-12">Nie dodałeś jeszcze żadnych przedmiotów.</div>
+        <button @click="$emit('close')" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm transition">✕</button>
       </div>
 
-      <div v-if="activeTab === 'requests'" class="space-y-4">
-        <div v-for="req in pendingRequests" :key="req.id" 
-             class="border border-slate-100 rounded-2xl p-4 bg-white shadow-sm space-y-3">
-          <div class="flex justify-between items-start">
-            <div>
-              <span class="text-[10px] bg-amber-50 text-amber-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                Status: {{ req.status }}
-              </span>
-              <h4 class="font-bold text-slate-800 text-sm mt-1.5">
-                Przedmiot: {{ getItemName(req.item_id) }}
-              </h4>
-              <p class="text-xs text-slate-400">Data prośby: {{ new Date(req.created_at).toLocaleDateString() }}</p>
-            </div>
+      <div class="flex border-b border-slate-100 px-6 bg-white">
+        <button 
+          @click="activeTab = 'items'" 
+          :class="activeTab === 'items' ? 'border-green-600 text-green-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+          class="flex-1 text-center py-3.5 text-sm border-b-2 transition"
+        >
+          📦 Moje ogłoszenia ({{ localMyItems.length }})
+        </button>
+        <button 
+          @click="activeTab = 'account'" 
+          :class="activeTab === 'account' ? 'border-green-600 text-green-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+          class="flex-1 text-center py-3.5 text-sm border-b-2 transition"
+        >
+          👤 Moje konto / Profil
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+        
+        <div v-if="activeTab === 'items'" class="space-y-3">
+          <div v-if="loadingItems" class="text-center py-8 text-slate-400 text-sm flex flex-col items-center gap-2">
+            <div class="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+            <span>Wczytywanie Twoich narzędzi...</span>
           </div>
 
-          <div v-if="req.status === 'oczekuje'" class="flex gap-2 pt-1">
-            <button @click="updateRequestStatus(req.id, 'wypozyczone')" 
-                    class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl text-xs font-bold transition">
-              Akceptuj 👍
-            </button>
-            <button @click="updateRequestStatus(req.id, 'odrzucone')" 
-                    class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold transition">
-              Odrzuć
-            </button>
-          </div>
+          <template v-else>
+            <div v-if="localMyItems.length === 0" class="text-center py-12 text-slate-400 text-sm">
+              Nie dodałeś jeszcze żadnych narzędzi.
+            </div>
+            
+            <div 
+              v-for="item in localMyItems" 
+              :key="item.id" 
+              class="bg-white border border-slate-150 rounded-xl p-4 shadow-sm flex items-center justify-between gap-4"
+            >
+              <div class="min-w-0">
+                <h3 class="font-bold text-sm text-slate-800 truncate">{{ item.name }}</h3>
+                <p v-if="item.category" class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold inline-block mt-1 uppercase tracking-wider">{{ item.category }}</p>
+              </div>
+              <button 
+                @click="deleteLocalItem(item.id)" 
+                class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0"
+              >
+                🗑️ Usuń
+              </button>
+            </div>
+          </template>
         </div>
-        <div v-if="pendingRequests.length === 0" class="text-center text-slate-400 text-sm py-12">Brak aktualnych próśb o wypożyczenie.</div>
+
+        <div v-if="activeTab === 'account'" class="space-y-4">
+          <div v-if="loadingProfile" class="text-center py-8 text-slate-400 text-sm flex flex-col items-center gap-2">
+            <div class="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+            <span>Wczytywanie danych konta...</span>
+          </div>
+
+          <template v-else>
+            <div class="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm space-y-4">
+              <div>
+                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Imię</label>
+                <input v-model="profileData.name" placeholder="np. Jan" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nazwisko</label>
+                <input v-model="profileData.surname" placeholder="np. Kowalski" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Numer telefonu</label>
+                <input v-model="profileData.phone" type="tel" placeholder="np. 500 600 700" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold text-slate-700 tracking-wide" />
+              </div>
+            </div>
+
+            <button 
+              @click="updateProfile" 
+              :disabled="isSaving"
+              class="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-green-600/10 text-sm"
+            >
+              <span>{{ isSaving ? 'Zapisywanie zmian...' : '💾 Zapisz aktualne dane' }}</span>
+            </button>
+            
+            <p v-if="saveSuccess" class="text-center text-xs text-green-600 font-semibold animate-pulse">
+              ✓ Dane konta zostały pomyślnie zaktualizowane!
+            </p>
+          </template>
+        </div>
+
       </div>
 
     </div>
   </div>
 </template>
-<script setup>
-import { ref, onMounted, watch } from 'vue'
 
-const props = defineProps(['allItems'])
-const emit = defineEmits(['close', 'delete-item'])
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const emit = defineEmits(['close', 'delete-item', 'profile-updated'])
+
 const client = useSupabaseClient()
 
 const activeTab = ref('items')
-const pendingRequests = ref([])
-
-// NOWE: Lokalne, super szybkie zmienne dla Twoich przedmiotów
-const myItems = ref([])
+const loadingProfile = ref(true)
 const loadingItems = ref(true)
+const isSaving = ref(false)
+const saveSuccess = ref(false)
 
-// Funkcja pobierająca przedmioty zalogowanego użytkownika prosto z bazy danych
-async function fetchMyItems() {
-  loadingItems.value = true
-  
-  // Pobieramy sesję prosto z tokenu przeglądarki
-  const { data: { session } } = await client.auth.getSession()
-  const userId = session?.user?.id
-  
-  if (!userId) {
-    myItems.value = []
-    loadingItems.value = false
-    return
-  }
+const localMyItems = ref([])
+const currentUserId = ref(null)
 
-  // Odpytujemy bazę tylko o rekordy tego konkretnego użytkownika (błyskawiczne dzięki indeksowi!)
-  const { data, error } = await client
-    .from('items')
-    .select('*')
-    .eq('user_id', userId)
-
-  if (!error) {
-    myItems.value = data
-  }
-  loadingItems.value = false
-}
-
-function getItemName(itemId) {
-  const item = props.allItems.find(i => i.id === itemId)
-  return item ? item.name : 'Nieznane narzędzie'
-}
-
-// Pobieramy rezerwacje dotyczące przedmiotów tego użytkownika
-async function fetchRequests() {
-  const myItemIds = myItems.value.map(item => item.id)
-  if (myItemIds.length === 0) {
-    pendingRequests.value = []
-    return
-  }
-
-  const { data, error } = await client
-    .from('rentals')
-    .select('*')
-    .in('item_id', myItemIds)
-    .order('created_at', { ascending: false })
-
-  if (!error) {
-    pendingRequests.value = data
-  }
-}
-
-async function updateRequestStatus(id, newStatus) {
-  const { error } = await client
-    .from('rentals')
-    .update({ status: newStatus })
-    .eq('id', id)
-
-  if (!error) {
-    alert(`Zmieniono status rezerwacji na: ${newStatus}!`)
-    await fetchRequests()
-  } else {
-    alert('Błąd aktualizacji: ' + error.message)
-  }
-}
-
-// Inicjalizacja komponentu po otwarciu panelu
-onMounted(async () => {
-  await fetchMyItems() // Najpierw pobierz przedmioty użytkownika
-  await fetchRequests() // Potem pobierz powiązane rezerwacje
+const profileData = ref({
+  name: '',
+  surname: '',
+  phone: ''
 })
 
-// Jeśli usuniesz przedmiot z poziomu tego komponentu, odśwież listę lokalną
-watch(() => props.allItems, async () => {
-  await fetchMyItems()
-  await fetchRequests()
-}, { deep: true })
+// Bezpieczne pobranie ID użytkownika bezpośrednio z aktualnej sesji Supabase
+async function initializeDashboard() {
+  try {
+    const { data: { session } } = await client.auth.getSession()
+    if (session?.user?.id) {
+      currentUserId.value = session.user.id
+      // Gdy mamy pewne ID, ładujemy asynchronicznie dane profilu i ogłoszenia jednocześnie
+      await Promise.all([
+        fetchUserProfile(session.user.id),
+        fetchUserItems(session.user.id)
+      ])
+    } else {
+      console.error("Brak aktywnej sesji użytkownika.")
+      loadingProfile.value = false
+      loadingItems.value = false
+    }
+  } catch (err) {
+    console.error("Błąd inicjalizacji panelu:", err)
+    loadingProfile.value = false
+    loadingItems.value = false
+  }
+}
+
+// Pobieranie profilu na podstawie jawnie przekazanego userId
+async function fetchUserProfile(userId) {
+  loadingProfile.value = true
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .select('name, surname, phone')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!error && data) {
+      profileData.value.name = data.name || ''
+      profileData.value.surname = data.surname || ''
+      profileData.value.phone = data.phone === 'EMPTY' ? '' : (data.phone || '')
+    }
+  } catch (err) {
+    console.error("Błąd ładowania profilu:", err)
+  } finally {
+    loadingProfile.value = false
+  }
+}
+
+// Błyskawiczne, dedykowane pobieranie ogłoszeń z bazy dla zalogowanego użytkownika
+async function fetchUserItems(userId) {
+  loadingItems.value = true
+  try {
+    const { data, error } = await client
+      .from('items')
+      .select('*')
+      .eq('user_id', userId)
+    
+    if (!error && data) {
+      localMyItems.value = data
+    }
+  } catch (err) {
+    console.error("Błąd ładowania przedmiotów:", err)
+  } finally {
+    loadingItems.value = false
+  }
+}
+
+// Aktualizacja profilu
+async function updateProfile() {
+  if (!profileData.value.name.trim() || !profileData.value.surname.trim() || !profileData.value.phone.trim()) {
+    alert("Wszystkie pola profilu muszą być wypełnione!")
+    return
+  }
+  if (!currentUserId.value) return
+
+  isSaving.value = true
+  saveSuccess.value = false
+  
+  try {
+    const { error } = await client
+      .from('profiles')
+      .upsert({
+        id: currentUserId.value,
+        name: profileData.value.name.trim(),
+        surname: profileData.value.surname.trim(),
+        phone: profileData.value.phone.trim(),
+        updated_at: new Date()
+      })
+
+    if (error) throw error
+
+    saveSuccess.value = true
+    emit('profile-updated')
+    setTimeout(() => { saveSuccess.value = false }, 4000)
+  } catch (err) {
+    alert("Wystąpił błąd podczas zapisu: " + err.message)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+// Obsługa usuwania przedmiotu bezpośrednio z poziomu komponentu z natychmiastowym odświeżeniem widoku
+async function deleteLocalItem(id) {
+  if (!currentUserId.value) return
+  emit('delete-item', id) // Informujemy app.vue (główną mapę) o usunięciu
+  
+  // Usuwamy lokalnie z tablicy w panelu, żeby reakcja interfejsu była natychmiastowa (0 sekund czekania)
+  localMyItems.value = localMyItems.value.filter(item => item.id !== id)
+}
+
+onMounted(() => {
+  initializeDashboard()
+})
 </script>
+
+<style scoped>
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-left {
+  animation: slideLeft 0.25s ease-out forwards;
+}
+</style>

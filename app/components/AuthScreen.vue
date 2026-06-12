@@ -37,6 +37,12 @@
           <div class="flex-grow border-t border-slate-200"></div>
         </div>
 
+        <button @click="loginWithGoogle" type="button"
+                class="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 px-4 rounded-2xl hover:bg-slate-50 transition active:scale-95 shadow-sm">
+          <img src="https://www.svgrepo.com/show/355037/google.svg" class="w-5 h-5" alt="Google" />
+          Zaloguj przez Google
+        </button>
+
         <button @click="loginWithMagicLink" 
                 class="w-full border-2 border-green-600 text-green-600 py-3 rounded-2xl font-bold hover:bg-green-50 transition active:scale-95">
           Wyślij Magic Link na e-mail ✉️
@@ -53,6 +59,20 @@ const client = useSupabaseClient()
 
 const authEmail = ref('')
 const authPassword = ref('')
+
+// LOGOWANIE GOOGLE
+async function loginWithGoogle() {
+  const { error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin, // Po udanym zalogowaniu wróć na stronę główną
+    }
+  })
+
+  if (error) {
+    alert('Błąd logowania Google: ' + error.message)
+  }
+}
 
 // REJESTRACJA
 async function register() {
