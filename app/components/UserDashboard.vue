@@ -49,12 +49,20 @@
                 <h3 class="font-bold text-sm text-slate-800 truncate">{{ item.name }}</h3>
                 <p v-if="item.category" class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold inline-block mt-1 uppercase tracking-wider">{{ item.category }}</p>
               </div>
-              <button 
-                @click="deleteLocalItem(item.id)" 
-                class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0"
-              >
-                🗑️ Usuń
-              </button>
+              <div class="flex gap-2">
+                <button 
+                  @click="editingItem = item" 
+                  class="text-xs font-bold text-blue-500 hover:bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 transition flex-shrink-0"
+                >
+                  ✏️ Edytuj
+                </button>
+                <button 
+                  @click="deleteLocalItem(item.id)" 
+                  class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0"
+                >
+                  🗑️ Usuń
+                </button>
+              </div>
             </div>
           </template>
         </div>
@@ -71,12 +79,10 @@
                 <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Imię</label>
                 <input v-model="profileData.name" placeholder="np. Jan" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
               </div>
-
               <div>
                 <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nazwisko</label>
                 <input v-model="profileData.surname" placeholder="np. Kowalski" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
               </div>
-
               <div>
                 <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Numer telefonu</label>
                 <input v-model="profileData.phone" type="tel" placeholder="np. 500 600 700" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold text-slate-700 tracking-wide" />
@@ -96,10 +102,15 @@
             </p>
           </template>
         </div>
-
       </div>
-
     </div>
+
+    <AddItemModal 
+      v-if="editingItem" 
+      :editItem="editingItem" 
+      @close="editingItem = null" 
+      @saved="editingItem = null; initializeDashboard(); $emit('profile-updated');" 
+    />
   </div>
 </template>
 
@@ -107,7 +118,6 @@
 import { ref, onMounted } from 'vue'
 
 const emit = defineEmits(['close', 'delete-item', 'profile-updated'])
-
 const client = useSupabaseClient()
 
 const activeTab = ref('items')
@@ -115,134 +125,85 @@ const loadingProfile = ref(true)
 const loadingItems = ref(true)
 const isSaving = ref(false)
 const saveSuccess = ref(false)
+const editingItem = ref(null)
 
 const localMyItems = ref([])
 const currentUserId = ref(null)
 
-const profileData = ref({
-  name: '',
-  surname: '',
-  phone: ''
-})
+const profileData = ref({ name: '', surname: '', phone: '' })
 
-// Bezpieczne pobranie ID użytkownika bezpośrednio z aktualnej sesji Supabase
 async function initializeDashboard() {
   try {
     const { data: { session } } = await client.auth.getSession()
     if (session?.user?.id) {
       currentUserId.value = session.user.id
-      // Gdy mamy pewne ID, ładujemy asynchronicznie dane profilu i ogłoszenia jednocześnie
       await Promise.all([
         fetchUserProfile(session.user.id),
         fetchUserItems(session.user.id)
       ])
     } else {
-      console.error("Brak aktywnej sesji użytkownika.")
       loadingProfile.value = false
       loadingItems.value = false
     }
   } catch (err) {
-    console.error("Błąd inicjalizacji panelu:", err)
     loadingProfile.value = false
     loadingItems.value = false
   }
 }
 
-// Pobieranie profilu na podstawie jawnie przekazanego userId
 async function fetchUserProfile(userId) {
   loadingProfile.value = true
   try {
-    const { data, error } = await client
-      .from('profiles')
-      .select('name, surname, phone')
-      .eq('id', userId)
-      .maybeSingle()
-
+    const { data, error } = await client.from('profiles').select('name, surname, phone').eq('id', userId).maybeSingle()
     if (!error && data) {
       profileData.value.name = data.name || ''
       profileData.value.surname = data.surname || ''
       profileData.value.phone = data.phone === 'EMPTY' ? '' : (data.phone || '')
     }
-  } catch (err) {
-    console.error("Błąd ładowania profilu:", err)
   } finally {
     loadingProfile.value = false
   }
 }
 
-// Błyskawiczne, dedykowane pobieranie ogłoszeń z bazy dla zalogowanego użytkownika
 async function fetchUserItems(userId) {
   loadingItems.value = true
   try {
-    const { data, error } = await client
-      .from('items')
-      .select('*')
-      .eq('user_id', userId)
-    
-    if (!error && data) {
-      localMyItems.value = data
-    }
-  } catch (err) {
-    console.error("Błąd ładowania przedmiotów:", err)
+    const { data, error } = await client.from('items').select('*').eq('user_id', userId)
+    if (!error && data) localMyItems.value = data
   } finally {
     loadingItems.value = false
   }
 }
 
-// Aktualizacja profilu
 async function updateProfile() {
   if (!profileData.value.name.trim() || !profileData.value.surname.trim() || !profileData.value.phone.trim()) {
-    alert("Wszystkie pola profilu muszą być wypełnione!")
-    return
+    return alert("Wszystkie pola profilu muszą być wypełnione!")
   }
-  if (!currentUserId.value) return
-
   isSaving.value = true
-  saveSuccess.value = false
-  
   try {
-    const { error } = await client
-      .from('profiles')
-      .upsert({
-        id: currentUserId.value,
-        name: profileData.value.name.trim(),
-        surname: profileData.value.surname.trim(),
-        phone: profileData.value.phone.trim(),
-        updated_at: new Date()
-      })
-
+    const { error } = await client.from('profiles').upsert({
+      id: currentUserId.value,
+      name: profileData.value.name.trim(),
+      surname: profileData.value.surname.trim(),
+      phone: profileData.value.phone.trim(),
+      updated_at: new Date()
+    })
     if (error) throw error
-
     saveSuccess.value = true
     emit('profile-updated')
     setTimeout(() => { saveSuccess.value = false }, 4000)
-  } catch (err) {
-    alert("Wystąpił błąd podczas zapisu: " + err.message)
-  } finally {
-    isSaving.value = false
-  }
+  } catch (err) { alert("Błąd: " + err.message) } finally { isSaving.value = false }
 }
 
-// Obsługa usuwania przedmiotu bezpośrednio z poziomu komponentu z natychmiastowym odświeżeniem widoku
 async function deleteLocalItem(id) {
-  if (!currentUserId.value) return
-  emit('delete-item', id) // Informujemy app.vue (główną mapę) o usunięciu
-  
-  // Usuwamy lokalnie z tablicy w panelu, żeby reakcja interfejsu była natychmiastowa (0 sekund czekania)
+  emit('delete-item', id)
   localMyItems.value = localMyItems.value.filter(item => item.id !== id)
 }
 
-onMounted(() => {
-  initializeDashboard()
-})
+onMounted(() => { initializeDashboard() })
 </script>
 
 <style scoped>
-@keyframes slideLeft {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-.animate-slide-left {
-  animation: slideLeft 0.25s ease-out forwards;
-}
+@keyframes slideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.animate-slide-left { animation: slideLeft 0.25s ease-out forwards; }
 </style>
