@@ -60,19 +60,19 @@
               </div>
             </div>
 
-           <div class="flex gap-2">
-  <a v-if="item.profiles?.phone && item.profiles.phone !== 'EMPTY'" 
-     :href="'tel:' + item.profiles.phone" 
-     class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-lg shadow-green-600/10 text-base">
-    📞 Zadzwoń
-  </a>
-  <button 
-    @click="$emit('open-chat', item)" 
-    class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] text-base"
-  >
-    💬 Wiadomość
-  </button>
-</div>
+            <div class="flex gap-2">
+              <a v-if="item.profiles?.phone && item.profiles.phone !== 'EMPTY'" 
+                 :href="'tel:' + item.profiles.phone" 
+                 class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-lg shadow-green-600/10 text-base">
+                📞 Zadzwoń
+              </a>
+              <button 
+                @click="$emit('start-chat', item)" 
+                class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] text-base"
+              >
+                💬 Wiadomość
+              </button>
+            </div>
           </template>
 
           <template v-else>
@@ -91,9 +91,10 @@
 
 <script setup>
 import { ZoomIn, X } from 'lucide-vue-next'
+import { ref } from 'vue'
 
 const props = defineProps(['item', 'isLoggedIn', 'distanceText'])
-const emit = defineEmits(['close', 'trigger-login'])
+const emit = defineEmits(['close', 'trigger-login', 'start-chat'])
 const client = useSupabaseClient()
 const zoomedImage = ref(null)
 

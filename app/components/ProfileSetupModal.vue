@@ -1,4 +1,3 @@
-
 <template>
   <div class="fixed inset-0 flex items-end md:items-center justify-center z-[10000] p-0 md:p-4 bg-slate-900/50 backdrop-blur-sm">
     <div class="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up">
@@ -46,10 +45,6 @@ const props = defineProps({
   userId: {
     type: String,
     required: true
-  },
-  userEmail: {
-    type: String,
-    default: ''
   }
 })
 
@@ -71,15 +66,14 @@ async function saveProfileFirst() {
 
   isSavingProfile.value = true
   try {
+    // Wysyłamy tylko czyste dane, aby nie naruszyć zasad RLS
     const { error } = await client
       .from('profiles')
       .upsert({
         id: props.userId,
         name: profileData.value.name.trim(),
         surname: profileData.value.surname.trim(),
-        phone: profileData.value.phone.trim(),
-        email: props.userEmail,
-        updated_at: new Date()
+        phone: profileData.value.phone.trim()
       })
 
     if (error) throw error
