@@ -57,7 +57,7 @@
                   ✏️ Edytuj
                 </button>
                 <button 
-                  @click="deleteLocalItem(item.id)" 
+                  @click="deleteItem(item)" 
                   class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0"
                 >
                   🗑️ Usuń
@@ -117,7 +117,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
-const emit = defineEmits(['close', 'delete-item', 'profile-updated'])
+const emit = defineEmits(['close', 'profile-updated'])
 const client = useSupabaseClient()
 
 const activeTab = ref('items')
@@ -195,9 +195,31 @@ async function updateProfile() {
   } catch (err) { alert("Błąd: " + err.message) } finally { isSaving.value = false }
 }
 
-async function deleteLocalItem(id) {
-  emit('delete-item', id)
-  localMyItems.value = localMyItems.value.filter(item => item.id !== id)
+async function deleteItem(item) {
+  if (!confirm('Czy na pewno chcesz usunąć to ogłoszenie?')) return;
+
+  try {
+    // 1. Usuwamy plik bezpośrednio korzystając z pełnej ścieżki z bazy danych
+    if (item.image_path) {
+      const { error: storageError } = await client.storage
+        .from('items')
+        .remove([item.image_path]); // remove przyjmuje tablicę ścieżek
+
+      if (storageError) throw storageError;
+      console.log("Plik usunięty ze Storage:", item.image_path);
+    }
+
+    // 2. Usuwamy rekord z bazy
+    const { error: dbError } = await client.from('items').delete().eq('id', item.id);
+    if (dbError) throw dbError;
+
+    // 3. Aktualizujemy widok
+    localMyItems.value = localMyItems.value.filter(i => i.id !== item.id);
+    alert("Usunięto pomyślnie.");
+  } catch (err) {
+    console.error("Błąd podczas usuwania:", err);
+    alert("Wystąpił błąd: " + err.message);
+  }
 }
 
 onMounted(() => { initializeDashboard() })

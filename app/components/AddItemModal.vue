@@ -63,28 +63,75 @@ function handleFileChange(event) {
   }
   file.value = selectedFile
 }
-
 async function saveItem() {
-  if (!newItem.value.name.trim() || !newItem.value.category) return alert("Nazwa i kategoria są wymagane!")
-  isSaving.value = true
+  if (!newItem.value.name.trim() || !newItem.value.category) 
+    return alert("Nazwa i kategoria są wymagane!");
+  
+  isSaving.value = true;
   try {
-    let imagePath = props.editItem?.image_path || null
-    if (file.value) {
-      const fileName = `${crypto.randomUUID()}.${file.value.name.split('.').pop()}`
-      const { data, error: uploadError } = await client.storage.from('items').upload(fileName, file.value)
-      if (uploadError) throw uploadError
-      imagePath = data.path
-    }
-    const payload = { name: newItem.value.name.trim(), category: newItem.value.category, description: newItem.value.description.trim(), image_path: imagePath }
+    // 1. Przygotuj dane ogłoszenia
+    const payload = { 
+      name: newItem.value.name.trim(), 
+      category: newItem.value.category, 
+      description: newItem.value.description.trim() 
+    };
+
+    let itemId;
+
     if (isEdit.value) {
-      const { error } = await client.from('items').update(payload).eq('id', props.editItem.id)
-      if (error) throw error
+      itemId = props.editItem.id;
+      // Jeśli edytujemy, ścieżka pliku już istnieje
+      let imagePath = props.editItem.image_path;
+
+      if (file.value) {
+        // Usuwamy stare zdjęcie/folder jeśli istnieje
+        await client.storage.from('items').remove([imagePath]);
+        
+        // Upload do folderu o nazwie ID
+        const fileName = `${crypto.randomUUID()}.${file.value.name.split('.').pop()}`;
+        const { data, error: uploadError } = await client.storage
+          .from('items')
+          .upload(`${itemId}/${fileName}`, file.value);
+        
+        if (uploadError) throw uploadError;
+        imagePath = data.path;
+      }
+      
+      await client.from('items').update({ ...payload, image_path: imagePath }).eq('id', itemId);
     } else {
-      payload.lat = parseFloat(props.coords.lat); payload.lng = parseFloat(props.coords.lng); payload.user_id = props.userId
-      const { error } = await client.from('items').insert([payload])
-      if (error) throw error
+      // 2. TWORZENIE NOWEGO - Najpierw Insert, aby mieć ID
+      payload.lat = parseFloat(props.coords.lat);
+      payload.lng = parseFloat(props.coords.lng);
+      payload.user_id = props.userId;
+      payload.image_path = null; // Tymczasowo brak
+
+      const { data: insertedItem, error: insertError } = await client
+        .from('items')
+        .insert([payload])
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      itemId = insertedItem.id;
+
+      // 3. Teraz Upload do folderu z tym ID
+      if (file.value) {
+        const fileName = `${crypto.randomUUID()}.${file.value.name.split('.').pop()}`;
+        const { data, error: uploadError } = await client.storage
+          .from('items')
+          .upload(`${itemId}/${fileName}`, file.value);
+        
+        if (uploadError) throw uploadError;
+        
+        // 4. Aktualizujemy rekord o ścieżkę pliku
+        await client.from('items').update({ image_path: data.path }).eq('id', itemId);
+      }
     }
-    emit('saved')
-  } catch (err) { alert("Błąd: " + err.message) } finally { isSaving.value = false }
+    emit('saved');
+  } catch (err) {
+    alert("Błąd: " + err.message);
+  } finally {
+    isSaving.value = false;
+  }
 }
 </script>

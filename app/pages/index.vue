@@ -133,7 +133,8 @@
     <div class="w-full max-w-sm"><AuthScreen /></div>
   </div>
   
-  <UserDashboard v-if="showDashboard && user" :myItems="myItemsOnly" @close="showDashboard = false" @delete-item="deleteItem" @profile-updated="refresh" />
+  <UserDashboard v-if="showDashboard && user"
+   :myItems="myItemsOnly" @close="showDashboard = false" @profile-updated="refresh" />
 </template>
 
 <script setup>
@@ -180,6 +181,7 @@ const filteredItems = computed(() => {
     return matchesSearch && matchesCategory
   })
 })
+
 
 const myItemsOnly = computed(() => {
   const currentUserId = user.value?.id
@@ -245,9 +247,6 @@ function handleMapClick(coords) {
 }
 
 async function logout() { await client.auth.signOut(); user.value = null; refresh() }
-async function deleteItem(id) { 
-  if (confirm('Usunąć ogłoszenie?')) { await client.from('items').delete().eq('id', id); await refresh() } 
-}
 
 const openChatForItem = (item) => {
   showChat.value = true
@@ -255,4 +254,5 @@ const openChatForItem = (item) => {
     chatWindowRef.value?.findOrCreateConversation(item)
   })
 }
+
 </script>
