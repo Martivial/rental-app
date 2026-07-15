@@ -120,12 +120,7 @@
 <ProfileSetupModal v-if="showProfileForm && user" :userId="user.id" :userEmail="user.email || ''" :initialData="profileData" @close="showProfileForm = false" @success="showProfileForm = false; isPlacingMode = true; refresh();" />
     <AddItemModal v-if="showModal && user && activeCoords" :coords="activeCoords" :userId="user.id" @close="showModal = false" @saved="showModal = false; activeCoords = null; refresh();" />
     
-  <ChatWindow 
-  v-show="showChat" 
-  :userId="user?.id" 
-  ref="chatWindowRef" 
-  @close="showChat = false" 
-/>
+ <ChatWindow v-if="user" v-show="showChat" :userId="user.id" ref="chatWindowRef" @close="showChat=false"/>
   </div>
 
   <div v-else class="h-screen w-full flex flex-col items-center justify-center bg-slate-50 relative px-4">

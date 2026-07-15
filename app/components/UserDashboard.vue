@@ -54,13 +54,13 @@
                   @click="editingItem = item" 
                   class="text-xs font-bold text-blue-500 hover:bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 transition flex-shrink-0"
                 >
-                  ✏️ Edytuj
+                Edytuj
                 </button>
                 <button 
                   @click="deleteItem(item)" 
                   class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0"
                 >
-                  🗑️ Usuń
+                  Usuń
                 </button>
               </div>
             </div>
@@ -199,21 +199,18 @@ async function deleteItem(item) {
   if (!confirm('Czy na pewno chcesz usunąć to ogłoszenie?')) return;
 
   try {
-    // 1. Usuwamy plik bezpośrednio korzystając z pełnej ścieżki z bazy danych
     if (item.image_path) {
       const { error: storageError } = await client.storage
         .from('items')
-        .remove([item.image_path]); // remove przyjmuje tablicę ścieżek
+        .remove([item.image_path]);
 
       if (storageError) throw storageError;
       console.log("Plik usunięty ze Storage:", item.image_path);
     }
 
-    // 2. Usuwamy rekord z bazy
     const { error: dbError } = await client.from('items').delete().eq('id', item.id);
     if (dbError) throw dbError;
 
-    // 3. Aktualizujemy widok
     localMyItems.value = localMyItems.value.filter(i => i.id !== item.id);
     alert("Usunięto pomyślnie.");
   } catch (err) {
