@@ -148,201 +148,201 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { X, ArrowLeft, Hammer } from 'lucide-vue-next'
 
-const props=defineProps({userId:String,isVisible:Boolean})
-const emit=defineEmits(['close'])
-const client=useSupabaseClient()
+const props = defineProps({ userId: String, isVisible: Boolean })
+const emit = defineEmits(['close'])
+const client = useSupabaseClient()
 
-const conversations=ref([])
-const activeChat=ref(null)
-const messages=ref([])
-const newMessage=ref('')
-const loadingMessages=ref(false)
-const isSending=ref(false)
-const messagesContainer=ref(null)
-let channel=null
-let tempItem=null
+const conversations = ref([])
+const activeChat = ref(null)
+const messages = ref([])
+const newMessage = ref('')
+const loadingMessages = ref(false)
+const isSending = ref(false)
+const messagesContainer = ref(null)
+let channel = null
+let tempItem = null
 
-const getImageUrl=path=>{
-  if(!path)return null
+const getImageUrl = path => {
+  if (!path) return null
   return client.storage.from('items').getPublicUrl(path).data.publicUrl
 }
 
-const formatDate=date=>{
-  if(!date)return ''
-  return new Date(date).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})
+const formatDate = date => {
+  if (!date) return ''
+  return new Date(date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
 }
 
-const scrollBottom=async()=>{
+const scrollBottom = async () => {
   await nextTick()
-  if(messagesContainer.value)messagesContainer.value.scrollTop=messagesContainer.value.scrollHeight
+  if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
 
-const loadConversations=async()=>{
-  if(!props.userId)return
-  const {data,error}=await client.from('conversations').select(`
-    id,created_at,user1_id,user2_id,item_id,
-    items(id,name,image_path),
+const loadConversations = async () => {
+  if (!props.userId) return
+  const { data, error } = await client.from('conversations').select(`
+    id, created_at, user1_id, user2_id, item_id,
+    items(id, name, image_path),
     p1:profiles!conversations_user1_id_fkey(name),
     p2:profiles!conversations_user2_id_fkey(name)
-  `).or(`user1_id.eq.${props.userId},user2_id.eq.${props.userId}`).order('created_at',{ascending:false})
+  `).or(`user1_id.eq.${props.userId},user2_id.eq.${props.userId}`).order('created_at', { ascending: false })
 
-  if(error)return console.error(error)
+  if (error) return console.error(error)
 
-  conversations.value=(data||[]).map(c=>({
+  conversations.value = (data || []).map(c => ({
     ...c,
-    other_user_name:c.user1_id===props.userId?(c.p2?.name||'Użytkownik'):(c.p1?.name||'Użytkownik')
+    other_user_name: c.user1_id === props.userId ? (c.p2?.name || 'Użytkownik') : (c.p1?.name || 'Użytkownik')
   }))
 }
 
+const openConversation = async (chat) => {
 
-const openConversation=async(chat)=>{
-  activeChat.value=chat
-  loadingMessages.value=true
+  if(!props.userId) {
+    alert("Trwa ładowanie wiadomości, odczekaj chwile")
+    return;
+  }
+  activeChat.value = chat
+  loadingMessages.value = true
 
-  const {data}=await client.from('messages').select('*').eq('conversation_id',chat.id).order('created_at',{ascending:true})
-  messages.value=data||[]
-  loadingMessages.value=false
+  const { data } = await client.from('messages').select('*').eq('conversation_id', chat.id).order('created_at', { ascending: true })
+  messages.value = data || []
+  loadingMessages.value = false
 
-  await nextTick()
-  scrollBottom()
-
-  await markRead(chat.id)
+  await scrollBottom()
+  markRead(chat.id) // Optymalizacja: Nie czekamy na odczyt (await), niech działa w tle
   subscribe(chat.id)
 }
 
+const subscribe = id => {
+  if (channel) client.removeChannel(channel)
 
-const subscribe=id=>{
-  if(channel)client.removeChannel(channel)
-
-  channel=client.channel('chat-'+id).on('postgres_changes',{
-    event:'INSERT',
-    schema:'public',
-    table:'messages',
-    filter:`conversation_id=eq.${id}`
-  },payload=>{
-    if(!messages.value.find(m=>m.id===payload.new.id)){
+  channel = client.channel('chat-' + id).on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'messages',
+    filter: `conversation_id=eq.${id}`
+  }, payload => {
+    // Zapobiegamy duplikowaniu własnych wiadomości, które już dopisaliśmy lokalnie
+    if (!messages.value.find(m => m.id === payload.new.id)) {
       messages.value.push(payload.new)
       scrollBottom()
     }
   }).subscribe()
 }
 
+const send = async () => {
+  if(!props.userId) {
+    alert("Trwa ładowanie sesji, spróbuj ponownie za chwilę")
+    return;
+  }
+  if (!newMessage.value.trim() || isSending.value) return
 
-const send=async()=>{
-  if(!newMessage.value.trim()||isSending.value)return
+  const text = newMessage.value.trim()
+  newMessage.value = ''
+  isSending.value = true
 
-  const text=newMessage.value.trim()
-  newMessage.value=''
-  isSending.value=true
+  try {
+    let conversationId = activeChat.value?.id
 
-  try{
-    let conversationId=activeChat.value?.id
-
-    if(tempItem&&!conversationId){
-      const {data,error}=await client.from('conversations').insert({
-        item_id:tempItem.id,
-        user1_id:props.userId,
-        user2_id:tempItem.user_id
+    // Jeśli to nowa rozmowa, musimy ją najpierwutworzyć w bazie
+    if (tempItem && !conversationId) {
+      const { data, error } = await client.from('conversations').insert({
+        item_id: tempItem.id,
+        user1_id: props.userId,
+        user2_id: tempItem.user_id
       }).select('id').single()
 
-      if(error)throw error
-      conversationId=data.id
-      activeChat.value.id=conversationId
+      if (error) throw error
+      conversationId = data.id
+      activeChat.value.id = conversationId
+      tempItem = null
       await loadConversations()
     }
 
-    const temp={
-      id:crypto.randomUUID(),
-      conversation_id:conversationId,
-      sender_id:props.userId,
-      content:text,
-      created_at:new Date()
+    // Natychmiastowy podgląd lokalny (Optimistic Update)
+    const tempId = crypto.randomUUID()
+    const temp = {
+      id: tempId,
+      conversation_id: conversationId,
+      sender_id: props.userId,
+      content: text,
+      created_at: new Date().toISOString()
     }
 
     messages.value.push(temp)
     scrollBottom()
 
-    const {data,error}=await client.from('messages').insert({
-      conversation_id:conversationId,
-      sender_id:props.userId,
-      content:text
-    }).select().single()
+    // Wysyłamy do bazy w tle (bez czekania na skomplikowane selecty)
+    const { error } = await client.from('messages').insert({
+      id: tempId, // Wymuszenie naszego ID eliminuje problem duplikatów przy websocketach
+      conversation_id: conversationId,
+      sender_id: props.userId,
+      content: text
+    })
 
-    if(error)throw error
+    if (error) throw error
 
-    const index=messages.value.findIndex(m=>m.id===temp.id)
-    if(index!==-1)messages.value[index]=data
-
-  }catch(e){
+  } catch (e) {
     console.error(e)
     alert('Nie udało się wysłać wiadomości')
-  }finally{
-    isSending.value=false
+  } finally {
+    isSending.value = false
   }
 }
 
-
-const markRead=async(id)=>{
+const markRead = async (id) => {
   await client.from('messages')
-    .update({is_read:true})
-    .eq('conversation_id',id)
-    .neq('sender_id',props.userId)
+    .update({ is_read: true })
+    .eq('conversation_id', id)
+    .neq('sender_id', props.userId)
 }
 
-
-const closeChat=()=>{
-  activeChat.value=null
-  messages.value=[]
-  tempItem=null
-  if(channel){
+const closeChat = () => {
+  activeChat.value = null
+  messages.value = []
+  tempItem = null
+  if (channel) {
     client.removeChannel(channel)
-    channel=null
+    channel = null
   }
 }
 
-
-const findOrCreateConversation=async(item)=>{
-  const {data}=await client.from('conversations')
+const findOrCreateConversation = async (item) => {
+  const { data } = await client.from('conversations')
     .select(`
       *,
-      items(id,name,image_path),
+      items(id, name, image_path),
       p1:profiles!conversations_user1_id_fkey(name),
       p2:profiles!conversations_user2_id_fkey(name)
     `)
-    .eq('item_id',item.id)
+    .eq('item_id', item.id)
     .or(`and(user1_id.eq.${props.userId},user2_id.eq.${item.user_id}),and(user1_id.eq.${item.user_id},user2_id.eq.${props.userId})`)
     .maybeSingle()
 
-  if(data){
+  if (data) {
     openConversation({
       ...data,
-      other_user_name:data.user1_id===props.userId?(data.p2?.name||'Użytkownik'):(data.p1?.name||'Użytkownik')
+      other_user_name: data.user1_id === props.userId ? (data.p2?.name || 'Użytkownik') : (data.p1?.name || 'Użytkownik')
     })
-  }else{
-    tempItem=item
-    activeChat.value={
-      items:item,
-      other_user_name:item.profiles?.name||'Nowa wiadomość',
-      item_id:item.id
+  } else {
+    tempItem = item
+    activeChat.value = {
+      items: item,
+      other_user_name: item.profiles?.name || 'Nowa wiadomość',
+      item_id: item.id
     }
-    messages.value=[]
+    messages.value = []
   }
 }
 
+watch(() => props.userId, (newVal) => {
+  if (newVal) {
+    loadConversations()
+  }
+}, { immediate: true })
 
-watch(()=>props.userId,v=>{
-  if(v)loadConversations()
-},{immediate:true})
-
-
-onUnmounted(()=>{
-  if(channel)client.removeChannel(channel)
+onUnmounted(() => {
+  if (channel) client.removeChannel(channel)
 })
 
-
-defineExpose({findOrCreateConversation})
+defineExpose({ findOrCreateConversation })
 </script>
-<style scoped>
-.overflow-y-auto{scroll-behavior:smooth}
-input:disabled{cursor:not-allowed}
-</style>
