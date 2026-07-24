@@ -118,9 +118,16 @@
   @start-chat="openChatForItem" 
 />
 <ProfileSetupModal v-if="showProfileForm && user" :userId="user.id" :userEmail="user.email || ''" :initialData="profileData" @close="showProfileForm = false" @success="showProfileForm = false; isPlacingMode = true; refresh();" />
-    <AddItemModal v-if="showModal && user && activeCoords" :coords="activeCoords" :userId="user.id" @close="showModal = false" @saved="showModal = false; activeCoords = null; refresh();" />
-    
- <ChatWindow v-if="user" v-show="showChat" :userId="user.id" ref="chatWindowRef" @close="showChat=false"/>
+  <AddItemModal v-if="showModal && user && activeCoords" :coords="activeCoords" :userId="user.id" @close="showModal = false" @saved="showModal = false; activeCoords = null; refresh();" />
+  
+ <ChatWindow 
+  v-if="user && user.id" 
+  v-show="showChat" 
+  :userId="user.id" 
+  :initial-conversations="conversationsList"
+  ref="chatWindowRef" 
+  @close="showChat=false"
+/>
   </div>
 
   <div v-else class="h-screen w-full flex flex-col items-center justify-center bg-slate-50 relative px-4">
@@ -138,6 +145,7 @@ import { Hammer, Plus, User, LogOut, LogIn, Search, Filter, MessageSquare } from
 
 const client = useSupabaseClient()
 const user = useSupabaseUser() 
+const conversationsList = ref([])
 
 const showDashboard = ref(false)
 const showModal = ref(false)
@@ -150,7 +158,7 @@ const profileData = ref({ name: '', surname: '', phone: '' })
 const selectedItem = ref(null)
 const showChat = ref(false)
 const chatWindowRef = ref(null)
-const totalUnread = ref(0) // Tutaj możesz zliczać globalne powiadomienia
+const totalUnread = ref(0) 
 
 const searchQuery = ref('')
 const selectedCategory = ref('')
@@ -226,7 +234,11 @@ function initAutomaticLocation() {
 
 onMounted(async () => {
   initAutomaticLocation()
-  client.auth.onAuthStateChange((event, session) => { user.value = session?.user || null; refresh() })
+  await loadConversations()
+client.auth.onAuthStateChange(async (event, session) => { 
+    user.value = session?.user || null
+    if (user.value) await loadConversations() 
+    refresh() })
 })
 
 function goToMyLocation() {
@@ -249,5 +261,41 @@ const openChatForItem = (item) => {
     chatWindowRef.value?.findOrCreateConversation(item)
   })
 }
+async function loadConversations() {
+  // 1. Pobieramy aktualnie zalogowanego użytkownika bezpośrednio z serwera Supabase Auth
+  const { data: { user: authUser }, error: authError } = await client.auth.getUser()
+  
+  if (authError || !authUser) {
+    console.error("Brak zalogowanego użytkownika", authError)
+    return
+  }
+
+  // Przypisujemy do zmiennej, żeby cały komponent wiedział, kto jest zalogowany
+  user.value = authUser
+
+  // 2. Teraz pobieramy konwersacje mając 100% pewne, poprawne ID z bazy/auth
+  const { data, error } = await client.from('conversations').select(`
+      id, created_at, user1_id, user2_id, item_id,
+      items(id, name, image_path),
+      p1:profiles!conversations_user1_id_fkey(name),
+      p2:profiles!conversations_user2_id_fkey(name)
+    `)
+    .or(`user1_id.eq.${authUser.id},user2_id.eq.${authUser.id}`)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error("Błąd pobierania wiadomości", error)
+    return
+  }
+
+  // 3. Mapujemy wyniki, dopisując nazwę drugiego użytkownika
+  conversationsList.value = (data || []).map(c => ({
+    ...c,
+    other_user_name: c.user1_id === authUser.id 
+      ? (c.p2?.name || 'Użytkownik') 
+      : (c.p1?.name || 'Użytkownik')
+  }))
+}
+
 
 </script>

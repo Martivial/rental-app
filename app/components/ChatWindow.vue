@@ -148,11 +148,25 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { X, ArrowLeft, Hammer } from 'lucide-vue-next'
 
-const props = defineProps({ userId: String, isVisible: Boolean })
+const props = defineProps({
+  userId: {
+    type: String,
+    required: true
+  },
+  isVisible: {
+    type: Boolean,
+    default: false
+  },
+  initialConversations: {
+    type: Array,
+    default: () => []
+  }
+})
+
 const emit = defineEmits(['close'])
 const client = useSupabaseClient()
 
-const conversations = ref([])
+const conversations = ref(props.initialConversations)
 const activeChat = ref(null)
 const messages = ref([])
 const newMessage = ref('')
@@ -161,6 +175,10 @@ const isSending = ref(false)
 const messagesContainer = ref(null)
 let channel = null
 let tempItem = null
+
+watch(() => props.initialConversations, (newList) => {
+  conversations.value = newList
+}, { immediate: true })
 
 const getImageUrl = path => {
   if (!path) return null
@@ -175,23 +193,6 @@ const formatDate = date => {
 const scrollBottom = async () => {
   await nextTick()
   if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-}
-
-const loadConversations = async () => {
-  if (!props.userId) return
-  const { data, error } = await client.from('conversations').select(`
-    id, created_at, user1_id, user2_id, item_id,
-    items(id, name, image_path),
-    p1:profiles!conversations_user1_id_fkey(name),
-    p2:profiles!conversations_user2_id_fkey(name)
-  `).or(`user1_id.eq.${props.userId},user2_id.eq.${props.userId}`).order('created_at', { ascending: false })
-
-  if (error) return console.error(error)
-
-  conversations.value = (data || []).map(c => ({
-    ...c,
-    other_user_name: c.user1_id === props.userId ? (c.p2?.name || 'Użytkownik') : (c.p1?.name || 'Użytkownik')
-  }))
 }
 
 const openConversation = async (chat) => {
@@ -333,12 +334,6 @@ const findOrCreateConversation = async (item) => {
     messages.value = []
   }
 }
-
-watch(() => props.userId, (newVal) => {
-  if (newVal) {
-    loadConversations()
-  }
-}, { immediate: true })
 
 onUnmounted(() => {
   if (channel) client.removeChannel(channel)
