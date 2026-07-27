@@ -120,6 +120,7 @@
 <ProfileSetupModal v-if="showProfileForm && user" :userId="user.id" :userEmail="user.email || ''" :initialData="profileData" @close="showProfileForm = false" @success="showProfileForm = false; isPlacingMode = true; refresh();" />
   <AddItemModal v-if="showModal && user && activeCoords" :coords="activeCoords" :userId="user.id" @close="showModal = false" @saved="showModal = false; activeCoords = null; refresh();" />
   
+  <ClientOnly>
  <ChatWindow 
   v-if="user && user.id" 
   v-show="showChat" 
@@ -127,7 +128,8 @@
   :initial-conversations="conversationsList"
   ref="chatWindowRef" 
   @close="showChat=false"
-/>
+  @messages-read="handleMessagesRead"/>
+</ClientOnly>
   </div>
 
   <div v-else class="h-screen w-full flex flex-col items-center justify-center bg-slate-50 relative px-4">
@@ -158,7 +160,6 @@ const profileData = ref({ name: '', surname: '', phone: '' })
 const selectedItem = ref(null)
 const showChat = ref(false)
 const chatWindowRef = ref(null)
-const totalUnread = ref(0) 
 
 const searchQuery = ref('')
 const selectedCategory = ref('')
@@ -278,7 +279,8 @@ async function loadConversations() {
       id, created_at, user1_id, user2_id, item_id,
       items(id, name, image_path),
       p1:profiles!conversations_user1_id_fkey(name),
-      p2:profiles!conversations_user2_id_fkey(name)
+      p2:profiles!conversations_user2_id_fkey(name),
+      messages(id, is_read, sender_id)
     `)
     .or(`user1_id.eq.${authUser.id},user2_id.eq.${authUser.id}`)
     .order('created_at', { ascending: false })
@@ -288,13 +290,30 @@ async function loadConversations() {
     return
   }
 
-  // 3. Mapujemy wyniki, dopisując nazwę drugiego użytkownika
+  // 3. Mapujemy wyniki, dopisując nazwę drugiego użytkownika i wiadomosci nieprzeczytane
   conversationsList.value = (data || []).map(c => ({
     ...c,
     other_user_name: c.user1_id === authUser.id 
       ? (c.p2?.name || 'Użytkownik') 
-      : (c.p1?.name || 'Użytkownik')
+      : (c.p1?.name || 'Użytkownik'),
+
+      unread_count: c.messages ? c.messages.filter(m => !m.is_read && m.sender_id !== authUser.id).length : 0
   }))
+}
+const totalUnread = computed(() => {
+  let sum = 0 // 1. Zaczynamy od zera
+  
+  for (const chat of conversationsList.value) {
+    sum += (chat.unread_count || 0) // 2. Do sumy dodajemy unread_count każdego chatu
+  }
+  
+  return sum // 3. Zwracamy ostateczny wynik
+})
+
+function handleMessagesRead(conversationId) {
+
+  const chat = conversationsList.value.find(c => c.id === conversationId)
+  if(chat) {chat.unread_count = 0 }
 }
 
 

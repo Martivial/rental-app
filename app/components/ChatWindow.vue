@@ -23,7 +23,6 @@
 
   <!-- LISTA ROZMÓW -->
   <section v-if="!activeChat" class="flex-1 overflow-y-auto bg-slate-50">
-
     <div v-if="!conversations.length" class="h-full flex items-center justify-center text-sm text-slate-400">
       Brak rozmów
     </div>
@@ -53,14 +52,9 @@
           {{ chat.other_user_name }}
         </p>
       </div>
-
     </div>
-
   </section>
 
-
-
-  <!-- CHAT -->
   <section v-else class="flex-1 flex flex-col min-h-0 bg-slate-50">
 
     <div class="p-3 bg-white border-b flex gap-3 items-center">
@@ -81,19 +75,13 @@
       </div>
     </div>
 
-
-
     <!-- WIADOMOŚCI -->
     <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-3">
-
       <div v-if="loadingMessages" class="text-center text-xs text-slate-400">
         Ładowanie...
       </div>
 
-
-      <div v-for="msg in messages"
-        :key="msg.id"
-        :class="msg.sender_id === userId ? 'flex justify-start' : 'flex justify-end'">
+      <div v-for="msg in messages" :key="msg.id" :class="msg.sender_id === userId ? 'flex justify-start' : 'flex justify-end'">
 
         <div :class="[
           'max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm',
@@ -103,7 +91,6 @@
         ]">
 
           <p>{{ msg.content }}</p>
-
           <span :class="[
             'block text-[10px] mt-1',
             msg.sender_id === userId
@@ -112,34 +99,25 @@
           ]">
             {{ formatDate(msg.created_at) }}
           </span>
-
         </div>
-
       </div>
-
     </div>
-
-
 
     <!-- INPUT -->
     <div class="p-3 bg-white border-t flex gap-2">
-
       <input
         v-model="newMessage"
         @keyup.enter="send"
         placeholder="Napisz wiadomość..."
         class="flex-1 bg-slate-100 rounded-xl px-4 text-sm outline-none focus:ring-2 focus:ring-green-500"
       >
-
       <button
         @click="send"
         :disabled="isSending"
         class="px-4 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50">
         Wyślij
       </button>
-
     </div>
-
   </section>
 
 </div>
@@ -163,7 +141,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'messages-read'])
 const client = useSupabaseClient()
 
 const conversations = ref(props.initialConversations)
@@ -211,6 +189,8 @@ const openConversation = async (chat) => {
   await scrollBottom()
   markRead(chat.id) // Optymalizacja: Nie czekamy na odczyt (await), niech działa w tle
   subscribe(chat.id)
+
+  emit('messages-read', chat.id)
 }
 
 const subscribe = id => {
@@ -244,7 +224,7 @@ const send = async () => {
   try {
     let conversationId = activeChat.value?.id
 
-    // Jeśli to nowa rozmowa, musimy ją najpierwutworzyć w bazie
+    // Jeśli to nowa rozmowa, musimy ją najpierw utworzyć w bazie
     if (tempItem && !conversationId) {
       const { data, error } = await client.from('conversations').insert({
         item_id: tempItem.id,
