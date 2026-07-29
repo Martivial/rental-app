@@ -1,6 +1,5 @@
 <template>
-<div v-show="isVisible" class="fixed bottom-4 right-4 w-[390px] h-[620px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[10020] flex flex-col overflow-hidden">
-
+<div v-show="isVisible" class="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 w-full sm:w-[390px] h-full sm:h-[620px] bg-white sm:rounded-2xl shadow-2xl border border-slate-300 z-[10020] flex flex-col overflow-hidden">
   <header class="h-16 border-b flex items-center justify-between px-4 bg-white flex-shrink-0">
     <div class="flex items-center gap-2 min-w-0">
       <button v-if="activeChat" @click="closeChat" class="text-slate-500 hover:text-slate-800">
@@ -8,11 +7,9 @@
       </button>
       <div class="min-w-0">
         <p class="font-bold text-sm text-slate-800 truncate">
-          {{ activeChat ? activeChat.other_user_name : 'Wiadomości' }}
+        {{ activeChat ? 'Wiadomości' : 'Konwersacje' }}
         </p>
-        <p v-if="activeChat" class="text-[11px] text-slate-400 truncate">
-          {{ activeChat.items?.name }}
-        </p>
+       
       </div>
     </div>
     <button @click="$emit('close')" class="text-slate-400 hover:text-slate-800">
@@ -27,32 +24,46 @@
       Brak rozmów
     </div>
 
-    <div v-for="chat in conversations" :key="chat.id"
-      @click="openConversation(chat)"
-      class="flex gap-3 p-4 bg-white border-b hover:bg-slate-50 cursor-pointer">
+   <div v-for="chat in conversations" :key="chat.id"
+  @click="openConversation(chat)"
+  class="flex items-center gap-3 p-4 bg-white border-b hover:bg-slate-50 transition-colors cursor-pointer">
 
-      <div class="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
-        <img v-if="chat.items?.image_path"
-          :src="getImageUrl(chat.items.image_path)"
-          class="w-full h-full object-cover">
-        <Hammer v-else :size="22" class="text-slate-300"/>
-      </div>
-
-      <div class="flex-1 min-w-0">
-        <div class="flex justify-between gap-2">
-          <p class="font-bold text-sm truncate text-slate-800">
-            {{ chat.items?.name || 'Przedmiot' }}
-          </p>
-          <span class="text-[10px] text-slate-400">
-            {{ formatDate(chat.created_at) }}
-          </span>
-        </div>
-
-        <p class="text-xs text-slate-500 truncate">
-          {{ chat.other_user_name }}
-        </p>
-      </div>
+  <!-- ZDJĘCIE Z BADGIEM POWIADOMIENIA W ROGU -->
+  <div class="relative shrink-0">
+    <div class="w-12 h-12 rounded-2xl bg-slate-100 overflow-hidden flex items-center justify-center border border-slate-100">
+      <img v-if="chat.items?.image_path"
+        :src="getImageUrl(chat.items.image_path)"
+        class="w-full h-full object-cover">
+      <Hammer v-else :size="22" class="text-slate-300"/>
     </div>
+
+    <!-- Czerwona kropka z licznikiem zawieszona w prawym górnym rogu zdjęcia -->
+    <span v-if="chat.unread_count > 0" 
+      class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md ring-2 ring-white">
+      {{ chat.unread_count }}
+    </span>
+  </div>
+
+  <!-- GŁÓWNA TREŚĆ (teraz ładnie w jednej linii po prawej stronie) -->
+  <div class="flex-1 min-w-0">
+    
+    <!-- Górny wiersz: Nazwa przedmiotu + Data -->
+    <div class="flex items-center justify-between gap-2 mb-1">
+      <p :class="['font-bold text-sm truncate', chat.unread_count > 0 ? 'text-slate-900 font-extrabold' : 'text-slate-800']">
+        {{ chat.items?.name || 'Przedmiot' }}
+      </p>
+      <span class="text-[11px] text-slate-400 shrink-0">
+        {{ formatDate(chat.created_at) }}
+      </span>
+    </div>
+
+    <!-- Dolny wiersz: Rozmówca -->
+    <p :class="['text-xs truncate', chat.unread_count > 0 ? 'text-slate-900 font-semibold' : 'text-slate-500']">
+      {{ chat.other_user_name }}
+    </p>
+
+  </div>
+</div>
   </section>
 
   <section v-else class="flex-1 flex flex-col min-h-0 bg-slate-50">
@@ -83,22 +94,22 @@
 
       <div v-for="msg in messages" :key="msg.id" :class="msg.sender_id === userId ? 'flex justify-start' : 'flex justify-end'">
 
+        
         <div :class="[
           'max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm',
           msg.sender_id === userId
           ? 'bg-green-600 text-white rounded-bl-none'
           : 'bg-white border text-slate-800 rounded-br-none'
-        ]">
+        ]"> <p>{{ msg.content }}</p>
 
-          <p>{{ msg.content }}</p>
           <span :class="[
             'block text-[10px] mt-1',
             msg.sender_id === userId
             ? 'text-green-100'
             : 'text-slate-400'
-          ]">
-            {{ formatDate(msg.created_at) }}
+          ]">{{ formatDate(msg.created_at) }}
           </span>
+          
         </div>
       </div>
     </div>
@@ -179,6 +190,9 @@ const openConversation = async (chat) => {
     alert("Trwa ładowanie wiadomości, odczekaj chwile")
     return;
   }
+
+  chat.unread_count = 0
+
   activeChat.value = chat
   loadingMessages.value = true
 

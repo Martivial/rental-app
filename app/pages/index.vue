@@ -171,6 +171,22 @@ const { data: items, refresh, pending } = await useLazyAsyncData('items', async 
   return data || []
 }, { immediate: true })
 
+onMounted(async () => {
+  initAutomaticLocation()
+  await loadConversations()
+
+  if(user.value?.id) { globalNotifications(user.value.id)}
+
+client.auth.onAuthStateChange(async (event, session) => { 
+    user.value = session?.user || null
+
+    if (user.value) {
+      await loadConversations()
+      globalNotifications(user.value.id)
+    }
+    refresh() })
+})
+
 function getImageUrl(path) {
   const { data } = client.storage.from('items').getPublicUrl(path)
   return data.publicUrl
@@ -233,15 +249,6 @@ function initAutomaticLocation() {
   }
 }
 
-onMounted(async () => {
-  initAutomaticLocation()
-  await loadConversations()
-client.auth.onAuthStateChange(async (event, session) => { 
-    user.value = session?.user || null
-    if (user.value) await loadConversations() 
-    refresh() })
-})
-
 function goToMyLocation() {
   navigator.geolocation.getCurrentPosition((pos) => { mapCenter.value = { lat: pos.coords.latitude, lng: pos.coords.longitude } })
 }
@@ -301,13 +308,12 @@ async function loadConversations() {
   }))
 }
 const totalUnread = computed(() => {
-  let sum = 0 // 1. Zaczynamy od zera
+  let sum = 0 
   
   for (const chat of conversationsList.value) {
-    sum += (chat.unread_count || 0) // 2. Do sumy dodajemy unread_count każdego chatu
+    sum += (chat.unread_count || 0)
   }
-  
-  return sum // 3. Zwracamy ostateczny wynik
+  return sum
 })
 
 function handleMessagesRead(conversationId) {
@@ -316,5 +322,22 @@ function handleMessagesRead(conversationId) {
   if(chat) {chat.unread_count = 0 }
 }
 
+let globalChannel
+
+function globalNotifications(userId) {
+  if(globalChannel) client.removeChannel(globalChannel)
+  globalChannel = client.channel('global-notifications').on('postgres_changes', {
+  event: 'INSERT', schema: 'public', table: 'messages'},(payload)=> {
+
+      const newMessage = payload.new
+
+      if(newMessage.sender_id !== userId) {
+        const chat = conversationsList.value.find(c => c.id === newMessage.conversationId)
+
+        if(chat) {chat.unread_count = (chat.unread_count || 0) +1}
+        else {loadConversations()}
+      }
+  }).subscribe()
+}
 
 </script>
