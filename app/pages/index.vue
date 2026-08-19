@@ -142,11 +142,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+
+import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
 import { Hammer, Plus, User, LogOut, LogIn, Search, Filter, MessageSquare } from 'lucide-vue-next'
 
 const client = useSupabaseClient()
-const user = useSupabaseUser() 
+const user = useSupabaseUser()
+
 const conversationsList = ref([])
 
 const showDashboard = ref(false)
@@ -165,26 +167,127 @@ const searchQuery = ref('')
 const selectedCategory = ref('')
 const categories = ['Elektronika', 'Ogród', 'Budowlane', 'AGD', 'Sport', 'Inne']
 
-const { data: items, refresh, pending } = await useLazyAsyncData('items', async () => {
-  const { data, error } = await client.from('items').select('*, profiles(*)')
-  if (error) { console.error("Błąd pobierania:", error.message); return [] }
-  return data || []
-}, { immediate: true })
+let authSubscription
+let globalChannel
+let visibilityListener
+const isRefreshing = ref(false)
+
+const items = ref([])
+const pending = ref(false)
+
+async function loadItems() {
+  pending.value = true
+
+  try {
+    const { data, error } = await client.from('items').select('*, profiles(*)')
+
+    if (error) {
+      console.error('Błąd pobierania:', error.message)
+      items.value = []
+      return
+    }
+
+    items.value = data || []
+  } catch (err) {
+    console.error('Błąd pobierania items:', err)
+    items.value = []
+  } finally {
+    pending.value = false
+  }
+}
+
+async function refresh() {
+  await loadItems()
+}
+
+async function refreshEverything() {
+  if (isRefreshing.value) return
+
+  isRefreshing.value = true
+
+  try {
+    const { data: { session }, error } = await client.auth.getSession()
+
+    if (error) {
+      console.error('Błąd pobierania sesji:', error)
+      return
+    }
+
+    user.value = session?.user || null
+
+    await loadItems()
+
+    if (!session?.user) {
+      conversationsList.value = []
+
+      if (globalChannel) {
+        await client.removeChannel(globalChannel)
+        globalChannel = null
+      }
+
+      return
+    }
+
+    await loadConversations()
+    globalNotifications(session.user.id)
+  } catch (err) {
+    console.error('Błąd refreshEverything:', err)
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 onMounted(async () => {
   initAutomaticLocation()
-  await loadConversations()
+  await refreshEverything()
 
-  if(user.value?.id) { globalNotifications(user.value.id)}
+  visibilityListener = async () => {
+    if (document.visibilityState === 'visible') {
+      await refreshEverything()
+    }
+  }
 
-client.auth.onAuthStateChange(async (event, session) => { 
+  document.addEventListener('visibilitychange', visibilityListener)
+
+  const { data } = client.auth.onAuthStateChange((event, session) => {
     user.value = session?.user || null
 
-    if (user.value) {
-      await loadConversations()
-      globalNotifications(user.value.id)
+    if (event === 'SIGNED_OUT') {
+      conversationsList.value = []
+
+      if (globalChannel) {
+        client.removeChannel(globalChannel)
+        globalChannel = null
+      }
+
+      return
     }
-    refresh() })
+
+    if (
+      event === 'SIGNED_IN' ||
+      event === 'TOKEN_REFRESHED' ||
+      event === 'USER_UPDATED'
+    ) {
+      setTimeout(() => {
+        refreshEverything()
+      }, 0)
+    }
+  })
+
+  authSubscription = data.subscription
+})
+
+onUnmounted(() => {
+  authSubscription?.unsubscribe()
+
+  if (visibilityListener) {
+    document.removeEventListener('visibilitychange', visibilityListener)
+  }
+
+  if (globalChannel) {
+    client.removeChannel(globalChannel)
+    globalChannel = null
+  }
 })
 
 function getImageUrl(path) {
@@ -194,6 +297,7 @@ function getImageUrl(path) {
 
 const filteredItems = computed(() => {
   if (!items.value) return []
+
   return items.value.filter(item => {
     const s = searchQuery.value.toLowerCase()
     const matchesSearch = item.name.toLowerCase().includes(s)
@@ -202,66 +306,112 @@ const filteredItems = computed(() => {
   })
 })
 
-
 const myItemsOnly = computed(() => {
   const currentUserId = user.value?.id
   if (!items.value || !currentUserId) return []
+
   return items.value.filter(item => String(item.user_id).trim() === String(currentUserId).trim())
 })
 
-function openItemDetails(item) { selectedItem.value = item }
+function openItemDetails(item) {
+  selectedItem.value = item
+}
 
 async function getValidUserId() {
   if (user.value?.id) return user.value.id
+
   const { data: { session } } = await client.auth.getSession()
-  if (session?.user?.id) { user.value = session.user; return session.user.id }
+
+  if (session?.user?.id) {
+    user.value = session.user
+    return session.user.id
+  }
+
   return null
 }
 
 async function checkProfileBeforeAdding() {
   const userId = await getValidUserId()
-  if (!userId || userId === 'undefined') { isGuestMode.value = false; return }
-  if (isPlacingMode.value) { isPlacingMode.value = false; return }
+
+  if (!userId || userId === 'undefined') {
+    isGuestMode.value = false
+    return
+  }
+
+  if (isPlacingMode.value) {
+    isPlacingMode.value = false
+    return
+  }
+
   try {
     const { data: profile, error } = await client.from('profiles').select('name, surname, phone').eq('id', userId).maybeSingle()
-    if (profile?.name && profile.surname && profile.phone && profile.phone !== 'EMPTY') { isPlacingMode.value = true } 
-    else { 
-      profileData.value = { name: profile?.name || '', surname: profile?.surname || '', phone: (profile?.phone === 'EMPTY' ? '' : profile?.phone) || '' }
-      showProfileForm.value = true 
+
+    if (error) {
+      console.error('Błąd pobierania profilu:', error.message)
     }
-  } catch (err) { showProfileForm.value = true }
+
+    if (profile?.name && profile.surname && profile.phone && profile.phone !== 'EMPTY') {
+      isPlacingMode.value = true
+    } else {
+      profileData.value = {
+        name: profile?.name || '',
+        surname: profile?.surname || '',
+        phone: (profile?.phone === 'EMPTY' ? '' : profile?.phone) || ''
+      }
+      showProfileForm.value = true
+    }
+  } catch (err) {
+    showProfileForm.value = true
+  }
 }
 
 function formatDistance(item) {
   if (!mapCenter.value || !item.lat || !item.lng) return 'Lokalizacja nieznana'
+
   const R = 6371000
   const lat1 = mapCenter.value.lat * Math.PI / 180, lat2 = item.lat * Math.PI / 180
   const deltaLat = (item.lat - mapCenter.value.lat) * Math.PI / 180
   const deltaLng = (item.lng - mapCenter.value.lng) * Math.PI / 180
-  const a = Math.sin(deltaLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng/2)**2
-  const distance = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))
-  return distance < 1000 ? `${Math.round(distance)}m stąd` : `${(distance/1000).toFixed(1)}km stąd`
+  const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2
+  const distance = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+
+  return distance < 1000 ? `${Math.round(distance)}m stąd` : `${(distance / 1000).toFixed(1)}km stąd`
 }
 
 function initAutomaticLocation() {
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((pos) => { mapCenter.value = { lat: pos.coords.latitude, lng: pos.coords.longitude } }, null, { timeout: 5000 })
+    navigator.geolocation.getCurrentPosition((pos) => {
+      mapCenter.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+    }, null, { timeout: 5000 })
   }
 }
 
 function goToMyLocation() {
-  navigator.geolocation.getCurrentPosition((pos) => { mapCenter.value = { lat: pos.coords.latitude, lng: pos.coords.longitude } })
+  navigator.geolocation.getCurrentPosition((pos) => {
+    mapCenter.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+  })
 }
 
-function handleMapClick(coords) { 
+function handleMapClick(coords) {
   if (isPlacingMode.value) {
-    activeCoords.value = coords; 
-    isPlacingMode.value = false; 
-    showModal.value = true;
+    activeCoords.value = coords
+    isPlacingMode.value = false
+    showModal.value = true
   }
 }
 
-async function logout() { await client.auth.signOut(); user.value = null; refresh() }
+async function logout() {
+  const { error } = await client.auth.signOut()
+
+  if (error) {
+    console.error('Błąd wylogowania:', error)
+    return
+  }
+
+  conversationsList.value = []
+  showChat.value = false
+  showDashboard.value = false
+}
 
 const openChatForItem = (item) => {
   showChat.value = true
@@ -269,26 +419,24 @@ const openChatForItem = (item) => {
     chatWindowRef.value?.findOrCreateConversation(item)
   })
 }
+
 async function loadConversations() {
-  // 1. Pobieramy aktualnie zalogowanego użytkownika bezpośrednio z serwera Supabase Auth
   const { data: { user: authUser }, error: authError } = await client.auth.getUser()
-  
+
   if (authError || !authUser) {
     console.error("Brak zalogowanego użytkownika", authError)
     return
   }
 
-  // Przypisujemy do zmiennej, żeby cały komponent wiedział, kto jest zalogowany
   user.value = authUser
 
-  // 2. Teraz pobieramy konwersacje mając 100% pewne, poprawne ID z bazy/auth
   const { data, error } = await client.from('conversations').select(`
-      id, created_at, user1_id, user2_id, item_id,
-      items(id, name, image_path),
-      p1:profiles!conversations_user1_id_fkey(name),
-      p2:profiles!conversations_user2_id_fkey(name),
-      messages(id, is_read, sender_id)
-    `)
+    id, created_at, user1_id, user2_id, item_id,
+    items(id, name, image_path),
+    p1:profiles!conversations_user1_id_fkey(name),
+    p2:profiles!conversations_user2_id_fkey(name),
+    messages(id, is_read, sender_id)
+  `)
     .or(`user1_id.eq.${authUser.id},user2_id.eq.${authUser.id}`)
     .order('created_at', { ascending: false })
 
@@ -297,46 +445,55 @@ async function loadConversations() {
     return
   }
 
-  // 3. Mapujemy wyniki, dopisując nazwę drugiego użytkownika i wiadomosci nieprzeczytane
   conversationsList.value = (data || []).map(c => ({
     ...c,
-    other_user_name: c.user1_id === authUser.id 
-      ? (c.p2?.name || 'Użytkownik') 
+    other_user_name: c.user1_id === authUser.id
+      ? (c.p2?.name || 'Użytkownik')
       : (c.p1?.name || 'Użytkownik'),
-
-      unread_count: c.messages ? c.messages.filter(m => !m.is_read && m.sender_id !== authUser.id).length : 0
+    unread_count: c.messages ? c.messages.filter(m => !m.is_read && m.sender_id !== authUser.id).length : 0
   }))
 }
+
 const totalUnread = computed(() => {
-  let sum = 0 
-  
+  let sum = 0
+
   for (const chat of conversationsList.value) {
     sum += (chat.unread_count || 0)
   }
+
   return sum
 })
 
 function handleMessagesRead(conversationId) {
-
   const chat = conversationsList.value.find(c => c.id === conversationId)
-  if(chat) {chat.unread_count = 0 }
+
+  if (chat) {
+    chat.unread_count = 0
+  }
 }
 
-let globalChannel
-
 function globalNotifications(userId) {
-  if(globalChannel) client.removeChannel(globalChannel)
+  if (globalChannel) {
+    client.removeChannel(globalChannel)
+    globalChannel = null
+  }
+
   globalChannel = client.channel('global-notifications').on('postgres_changes', {
-  event: 'INSERT', schema: 'public', table: 'messages'},(payload)=> {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'messages'
+  }, (payload) => {
+    const newMessage = payload.new
 
-      const newMessage = payload.new
+    if (newMessage.sender_id !== userId) {
+      const chat = conversationsList.value.find(c => c.id === newMessage.conversationId)
 
-      if(newMessage.sender_id !== userId) {
-        const chat = conversationsList.value.find(c => c.id === newMessage.conversationId)
-
-        if(chat) {chat.unread_count = (chat.unread_count || 0) +1}
-        else {loadConversations()}
+      if (chat) {
+        chat.unread_count = (chat.unread_count || 0) + 1
+      } else {
+        loadConversations()
       }
+    }
   }).subscribe()
 }
 

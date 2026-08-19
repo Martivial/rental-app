@@ -35,7 +35,7 @@ onMounted(async () => {
 })
 
 async function updatePassword() {
-  if (newPassword.value.length < 6) return alert('Hasło musi mieć min. 6 znaków.')
+  if (newPassword.value.length < 8) return alert('Hasło musi mieć min. 8 znaków.')
 
   const { error } = await client.auth.updateUser({
     password: newPassword.value
