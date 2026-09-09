@@ -25,7 +25,7 @@ onMounted(async () => {
     preferCanvas: true
   }).setView([startLat, startLng], startZoom)
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_339b_1_99d5060c2db4d7afe18a7c55', {
     maxZoom: 20
   }).addTo(map)
 

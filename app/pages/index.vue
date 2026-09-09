@@ -10,11 +10,6 @@
       <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
         <span v-if="user" class="text-xs text-slate-400 font-normal">Zalogowany jako: {{ user?.email }}</span>
 
-        <button @click="showChat = true" class="relative hover:text-green-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 transition">
-          <MessageSquare :size="14" /> Wiadomości
-          <span v-if="totalUnread > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{{ totalUnread }}</span>
-        </button>
-
         <button v-if="user" @click="checkProfileBeforeAdding" 
           :class="isPlacingMode ? 'bg-amber-500 text-white border-amber-500 scale-105' : 'bg-white text-green-600 border-green-600 hover:bg-green-50'"
           class="px-4 py-2 rounded-xl text-xs font-bold border shadow-sm transition-all duration-200"
@@ -23,6 +18,10 @@
         </button>
 
         <template v-if="user">
+           <button @click="showChat = true" class="relative hover:text-green-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 transition">
+          <MessageSquare :size="14" /> Wiadomości
+          <span v-if="totalUnread > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{{ totalUnread }}</span>
+        </button>
           <button @click="showDashboard = true" class="hover:text-green-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 hover:border-green-200 transition"><User :size="14" /> Mój Panel</button>
           <button @click="logout" class="text-red-500 hover:text-red-700 font-medium text-xs border border-red-100 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 transition"><LogOut :size="14" /> Wyloguj się</button>
         </template>
@@ -224,7 +223,6 @@ async function refreshEverything() {
         await client.removeChannel(globalChannel)
         globalChannel = null
       }
-
       return
     }
 
