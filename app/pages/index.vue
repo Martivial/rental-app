@@ -58,7 +58,7 @@
             </div>
             <div class="relative">
               <Filter class="absolute left-3 top-3 text-slate-400" :size="16" />
-              <select v-model="selectedCategory" class="w-full bg-slate-100 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-green-500 appearance-none">
+              <select v-model="selectedCategory" @change="handleCategoryChange" class="w-full bg-slate-100 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-green-500 appearance-none">
                 <option value="">Wszystkie kategorie</option>
                 <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
               </select>
@@ -168,7 +168,7 @@ const chatWindowRef = ref(null)
 
 const searchQuery = ref('')
 const selectedCategory = ref('')
-const categories = ['Elektronika', 'Ogród', 'Budowlane', 'AGD', 'Sport', 'Inne']
+const categories = ['Elektronika', 'Ogrod', 'Budowlane', 'AGD', 'Sport', 'Inne']
 
 let authSubscription
 let globalChannel
@@ -178,19 +178,14 @@ const isRefreshing = ref(false)
 const items = ref([])
 const pending = ref(false)
 
-  // Obserwujemy zmienną 'items' (czyli naszą listę przedmiotów z bazy danych)
+
 watch(items, (newItems) => {
-  // Sprawdzamy trzy warunki:
-  // 1. Czy w adresie URL jest parametr ?item=... (np. route.query.item istnieje)
-  // 2. Czy lista przedmiotów nie jest pusta (newItems.length > 0)
-  // 3. Czy modal nie jest już przypadkiem otwarty (!selectedItem.value)
+  
   if (route.query.item && newItems.length > 0 && !selectedItem.value) {
-    S
-    // Szukamy na pobranej liście przedmiotu, którego ID zgadza się z tym z linku
+  
     const foundItem = newItems.find(i => String(i.id) === String(route.query.item))
     
     if (foundItem) {
-      // Jeśli znaleźliśmy -> automatycznie otwieramy modal dla tego przedmiotu!
       selectedItem.value = foundItem
     }
   }
@@ -216,7 +211,7 @@ async function loadItems() {
         selectedItem.value = foundItem
       }
     }
-    
+
   } catch (err) {
     console.error('Błąd pobierania items:', err)
     items.value = []
@@ -266,6 +261,11 @@ async function refreshEverything() {
 }
 
 onMounted(async () => {
+
+  if(route.query.category) {
+    selectedCategory.value = route.query.category
+  }
+
   initAutomaticLocation()
   await refreshEverything()
 
@@ -534,4 +534,12 @@ function globalNotifications(userId) {
   }).subscribe()
 }
 
+function handleCategoryChange() {
+  const query = {...route.query}
+  if(selectedCategory.value) {
+    query.category = selectedCategory.value
+  }
+  else {delete query.category}
+  router.push({query})
+}
 </script>
