@@ -6,6 +6,7 @@
   >
     <div class="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-2xl shadow-2xl animate-slide-up overflow-hidden flex flex-col" @click.stop>
       
+      <!-- Zdjęcie przedmiotu -->
       <div class="h-44 bg-slate-100 relative flex items-center justify-center text-slate-300 text-5xl border-b border-slate-200 overflow-hidden group">
         <img 
           v-if="item.image_path" 
@@ -13,7 +14,9 @@
           class="w-full h-full object-contain transition duration-300 group-hover:scale-105" 
           alt="Zdjęcie przedmiotu" 
         />
-        <span v-else>📷</span>
+        <span v-else class="flex items-center justify-center text-slate-400">
+          <Camera :size="40" />
+        </span>
 
         <div 
           v-if="item.image_path"
@@ -30,12 +33,13 @@
         </button>
       </div>
 
+      <!-- Treść modala -->
       <div class="p-6 space-y-4">
         <div>
           <div class="flex items-center justify-between gap-2">
             <h2 class="text-xl font-black text-slate-800 leading-tight">{{ item.name }}</h2>
-            <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-bold whitespace-nowrap">
-              📍 {{ distanceText }}
+            <span class="inline-flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold whitespace-nowrap">
+              <MapPin :size="14" class="text-slate-400" /> {{ distanceText }}
             </span>
           </div>
           <span v-if="item.category" class="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded font-bold inline-block mt-2 uppercase tracking-wider border border-green-100">
@@ -50,34 +54,42 @@
 
         <div class="border-t border-slate-100 pt-3">
           <template v-if="isLoggedIn">
-            <div class="flex items-center gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100 mb-3">
+            <!-- Kafel właściciela -->
+            <div 
+              @click="navigateToProfile" 
+              class="flex items-center gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100 mb-3 hover:bg-slate-100 transition cursor-pointer group"
+            >
               <div class="w-10 h-10 bg-green-100 text-green-700 font-bold rounded-full flex items-center justify-center text-sm">
                 {{ item.profiles?.name?.charAt(0).toUpperCase() || 'S' }}
               </div>
-              <div class="flex flex-col">
+              <div class="flex flex-col flex-grow">
                 <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Właściciel</span>
-                <span class="font-bold text-slate-800 text-base">{{ item.profiles?.name || 'Nieznany' }}</span>
+                <span class="font-bold text-slate-800 text-base group-hover:text-green-600 transition flex items-center justify-between">
+                  {{ item.profiles?.name || 'Nieznany' }}
+                  <span class="text-xs text-slate-400 font-normal flex items-center gap-1">Zobacz profil <ChevronRight :size="14" /></span>
+                </span>
               </div>
             </div>
 
+            <!-- Przyciski kontaktowe -->
             <div class="flex gap-2">
               <a v-if="item.profiles?.phone && item.profiles.phone !== 'EMPTY'" 
                  :href="'tel:' + item.profiles.phone" 
                  class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-lg shadow-green-600/10 text-base">
-                📞 Zadzwoń
+                <Phone :size="18" /> Zadzwoń
               </a>
               <button 
                 @click="$emit('start-chat', item)" 
                 class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] text-base"
               >
-                💬 Wiadomość
+                <MessageSquare :size="18" /> Wiadomość
               </button>
             </div>
           </template>
 
           <template v-else>
             <div @click="$emit('trigger-login')" class="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl flex items-center gap-3 cursor-pointer transition">
-              <span class="text-2xl">🔒</span>
+              <Lock :size="20" class="flex-shrink-0 text-amber-700" />
               <p class="text-sm font-bold">Zaloguj się, aby zobaczyć dane kontaktowe.</p>
             </div>
           </template>
@@ -90,17 +102,28 @@
 </template>
 
 <script setup>
-import { ZoomIn, X } from 'lucide-vue-next'
+import { ZoomIn, X, Camera, MapPin, ChevronRight, Phone, MessageSquare, Lock } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const props = defineProps(['item', 'isLoggedIn', 'distanceText'])
 const emit = defineEmits(['close', 'trigger-login', 'start-chat'])
 const client = useSupabaseClient()
+const router = useRouter()
 const zoomedImage = ref(null)
 
 function getImageUrl(path) {
   const { data } = client.storage.from('items').getPublicUrl(path)
   return data.publicUrl
+}
+
+function navigateToProfile() {  
+  if (!props.item?.user_id) {
+    alert("Ten przedmiot NIE MA przypisanego user_id w bazie!")
+    return
+  }
+  emit('close')
+  router.push(`/profile/${props.item.user_id}`)
 }
 </script>
 
