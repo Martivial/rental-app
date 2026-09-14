@@ -112,7 +112,7 @@
   :item="selectedItem" 
   :isLoggedIn="!!user" 
   :distanceText="selectedItem ? formatDistance(selectedItem) : ''" 
-  @close="selectedItem = null" 
+  @close="closeItemDetails"
   @trigger-login="selectedItem = null; isGuestMode = false;" 
   @start-chat="openChatForItem" 
 />
@@ -142,17 +142,21 @@
 
 <script setup>
 
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { Hammer, Plus, User, LogOut, LogIn, Search, Filter, MessageSquare } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
+
+const route = useRoute()
+const router = useRouter()
 
 const conversationsList = ref([])
 
 const showDashboard = ref(false)
 const showModal = ref(false)
-const isGuestMode = ref(false)
+const isGuestMode = ref(true)
 const mapCenter = ref(null)
 const isPlacingMode = ref(false)
 const activeCoords = ref(null)
@@ -174,6 +178,24 @@ const isRefreshing = ref(false)
 const items = ref([])
 const pending = ref(false)
 
+  // Obserwujemy zmienną 'items' (czyli naszą listę przedmiotów z bazy danych)
+watch(items, (newItems) => {
+  // Sprawdzamy trzy warunki:
+  // 1. Czy w adresie URL jest parametr ?item=... (np. route.query.item istnieje)
+  // 2. Czy lista przedmiotów nie jest pusta (newItems.length > 0)
+  // 3. Czy modal nie jest już przypadkiem otwarty (!selectedItem.value)
+  if (route.query.item && newItems.length > 0 && !selectedItem.value) {
+    S
+    // Szukamy na pobranej liście przedmiotu, którego ID zgadza się z tym z linku
+    const foundItem = newItems.find(i => String(i.id) === String(route.query.item))
+    
+    if (foundItem) {
+      // Jeśli znaleźliśmy -> automatycznie otwieramy modal dla tego przedmiotu!
+      selectedItem.value = foundItem
+    }
+  }
+})
+
 async function loadItems() {
   pending.value = true
 
@@ -187,6 +209,14 @@ async function loadItems() {
     }
 
     items.value = data || []
+
+    if (route.query.item && !selectedItem.value) {
+      const foundItem = items.value.find(i => String(i.id) === String(route.query.item))
+      if (foundItem) {
+        selectedItem.value = foundItem
+      }
+    }
+    
   } catch (err) {
     console.error('Błąd pobierania items:', err)
     items.value = []
@@ -313,6 +343,15 @@ const myItemsOnly = computed(() => {
 
 function openItemDetails(item) {
   selectedItem.value = item
+  router.push({ 
+    query: { ...route.query, item: item.id } 
+  })
+}
+function closeItemDetails() {
+  selectedItem.value = null
+  const query = { ...route.query }
+  delete query.item
+  router.push({ query })
 }
 
 async function getValidUserId() {

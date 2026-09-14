@@ -10,7 +10,7 @@
         <img 
           v-if="item.image_path" 
           :src="getImageUrl(item.image_path)" 
-          class="w-full h-full object-cover transition duration-300 group-hover:scale-105" 
+          class="w-full h-full object-contain transition duration-300 group-hover:scale-105" 
           alt="Zdjęcie przedmiotu" 
         />
         <span v-else>📷</span>
