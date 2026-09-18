@@ -168,7 +168,18 @@ const chatWindowRef = ref(null)
 
 const searchQuery = ref('')
 const selectedCategory = ref('')
-const categories = ['Elektronika', 'Ogrod', 'Budowlane', 'AGD', 'Sport', 'Inne']
+const categories = [
+  'Narzędzia i Warsztat',
+  'Ogród i Otoczenie',
+  'Sport i Rekreacja',
+  'Turystyka i Camping',
+  'Imprezy i Wydarzenia',
+  'Dla dzieci i Zabawki',
+  'Dom i AGD',
+  'Elektronika i Hobby',
+  'Motoryzacja i Transport',
+  'Inne'
+]
 
 let authSubscription
 let globalChannel
