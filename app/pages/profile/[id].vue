@@ -83,7 +83,7 @@
           <div 
             v-for="item in userItems" 
             :key="item.id"
-            @click="router.push(`/?item=${item.id}`)"
+           @click="router.push(`/items/${item.id}`)"
             class="bg-white p-4 rounded-3xl shadow-sm border border-slate-200/80 hover:border-green-500/50 hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group"
           >
             <div class="flex gap-4 items-start">

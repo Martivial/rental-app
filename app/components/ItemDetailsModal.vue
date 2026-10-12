@@ -1,133 +1,180 @@
 <template>
-  <div 
-    v-if="item" 
-    class="fixed inset-0 flex items-end md:items-center justify-center z-[10005] p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm" 
-    @click="$emit('close')"
-  >
-    <div class="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-2xl shadow-2xl animate-slide-up overflow-hidden flex flex-col" @click.stop>
+  <div v-if="item" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
       
-      <!-- Zdjęcie przedmiotu -->
-      <div class="h-44 bg-slate-100 relative flex items-center justify-center text-slate-300 text-5xl border-b border-slate-200 overflow-hidden group">
-        <img 
-          v-if="item.image_path" 
-          :src="getImageUrl(item.image_path)" 
-          class="w-full h-full object-contain transition duration-300 group-hover:scale-105" 
-          alt="Zdjęcie przedmiotu" 
-        />
-        <span v-else class="flex items-center justify-center text-slate-400">
-          <Camera :size="40" />
-        </span>
-
-        <div 
-          v-if="item.image_path"
-          @click="zoomedImage = getImageUrl(item.image_path)"
-          class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer backdrop-blur-[2px]"
-        >
-          <div class="bg-white/20 p-3 rounded-full border border-white/30 backdrop-blur-md shadow-lg transform transition-transform hover:scale-110">
-            <ZoomIn :size="28" color="white" stroke-width="2.5" />
-          </div>
+      <!-- Nagłówek modala -->
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <span v-if="item.category" class="text-[10px] font-bold text-green-700 bg-green-50 border border-green-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            {{ item.category }}
+          </span>
+          <h2 class="text-xl font-black text-slate-900 mt-1">{{ item.name }}</h2>
         </div>
-
-        <button @click="$emit('close')" class="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition backdrop-blur-md border border-white/10">
-          <X :size="18" />
+        <button @click="$emit('close')" class="w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center font-bold transition cursor-pointer">
+          ✕
         </button>
       </div>
 
       <!-- Treść modala -->
-      <div class="p-6 space-y-4">
-        <div>
-          <div class="flex items-center justify-between gap-2">
-            <h2 class="text-xl font-black text-slate-800 leading-tight">{{ item.name }}</h2>
-            <span class="inline-flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold whitespace-nowrap">
-              <MapPin :size="14" class="text-slate-400" /> {{ distanceText }}
+      <div class="p-6 overflow-y-auto space-y-6 flex-1">
+        
+        <!-- Zdjęcie przedmiotu -->
+        <div class="h-64 bg-slate-950 rounded-2xl overflow-hidden relative flex items-center justify-center">
+          <div 
+            v-if="item.image_path" 
+            class="absolute inset-0 bg-cover bg-center blur-xl opacity-40 scale-110 pointer-events-none"
+            :style="{ backgroundImage: `url(${getImageUrl(item.image_path)})` }"
+          ></div>
+          <img 
+            v-if="item.image_path" 
+            :src="getImageUrl(item.image_path)" 
+            class="max-h-full max-w-full object-contain relative z-10" 
+          />
+          <span v-else class="text-slate-400 text-xs font-semibold">Brak zdjęcia</span>
+        </div>
+
+        <!-- Opis -->
+        <div class="space-y-1.5">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Opis</h3>
+          <p class="text-slate-600 text-sm leading-relaxed">{{ item.description || 'Brak opisu.' }}</p>
+        </div>
+
+        <!-- Informacja o właścicielu -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Właściciel</span>
+            <span class="font-bold text-slate-800 text-sm">
+              {{ item.profiles?.name || 'Nieznany' }} {{ item.profiles?.surname || '' }}
             </span>
           </div>
-          <span v-if="item.category" class="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded font-bold inline-block mt-2 uppercase tracking-wider border border-green-100">
-            {{ item.category }}
-          </span>
+          <button 
+            @click="goToFullDetails"
+            class="text-xs font-bold text-green-600 hover:text-green-700 bg-white border border-green-200 px-3 py-1.5 rounded-xl shadow-2xs transition cursor-pointer"
+          >
+            Pełny widok strony →
+          </button>
         </div>
 
-        <div v-if="item.description" class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-          <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Opis przedmiotu</h4>
-          <p class="text-slate-600 text-sm leading-relaxed whitespace-pre-line">{{ item.description }}</p>
+        <!-- Sekcja zajętych terminów (pobierana przez composable) -->
+        <div v-if="acceptedRanges.length > 0" class="bg-red-50 border border-red-200 p-4 rounded-2xl space-y-2">
+          <h4 class="text-xs font-black text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Ban :size="14" /> Terminy niedostępne
+          </h4>
+          <div class="space-y-1">
+            <div v-for="(range, idx) in acceptedRanges" :key="idx" class="text-xs text-red-700 font-bold bg-white px-3 py-2 rounded-xl border border-red-100 flex justify-between">
+              <span>Od {{ range.start_date }} do {{ range.end_date }}</span>
+              <span class="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase">Zajęte</span>
+            </div>
+          </div>
         </div>
 
-        <div class="border-t border-slate-100 pt-3">
+        <!-- Formularz rezerwacji w modalu -->
+        <div class="border-t border-slate-100 pt-5 space-y-3">
+          <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Szybka rezerwacja</h4>
+          
           <template v-if="isLoggedIn">
-            <!-- Kafel właściciela -->
-            <div 
-              @click="navigateToProfile" 
-              class="flex items-center gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100 mb-3 hover:bg-slate-100 transition cursor-pointer group"
-            >
-              <div class="w-10 h-10 bg-green-100 text-green-700 font-bold rounded-full flex items-center justify-center text-sm">
-                {{ item.profiles?.name?.charAt(0).toUpperCase() || 'S' }}
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-[11px] font-bold text-slate-500 block mb-1">Od kiedy</label>
+                <input type="date" v-model="startDate" :min="todayString" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none" />
               </div>
-              <div class="flex flex-col flex-grow">
-                <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Właściciel</span>
-                <span class="font-bold text-slate-800 text-base group-hover:text-green-600 transition flex items-center justify-between">
-                  {{ item.profiles?.name || 'Nieznany' }}
-                  <span class="text-xs text-slate-400 font-normal flex items-center gap-1">Zobacz profil <ChevronRight :size="14" /></span>
-                </span>
+              <div>
+                <label class="text-[11px] font-bold text-slate-500 block mb-1">Do kiedy</label>
+                <input type="date" v-model="endDate" :min="startDate || todayString" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none" />
               </div>
             </div>
 
-            <!-- Przyciski kontaktowe -->
-            <div class="flex gap-2">
-              <a v-if="item.profiles?.phone && item.profiles.phone !== 'EMPTY'" 
-                 :href="'tel:' + item.profiles.phone" 
-                 class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-lg shadow-green-600/10 text-base">
-                <Phone :size="18" /> Zadzwoń
-              </a>
-              <button 
-                @click="$emit('start-chat', item)" 
-                class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] text-base"
-              >
-                <MessageSquare :size="18" /> Wiadomość
-              </button>
-            </div>
+            <button 
+              @click="handleModalRequestRental"
+              :disabled="isSubmitting"
+              class="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-extrabold py-3 rounded-xl transition shadow-md text-xs cursor-pointer"
+            >
+              {{ isSubmitting ? 'Wysyłanie...' : 'Wyślij prośbę o rezerwację' }}
+            </button>
           </template>
 
           <template v-else>
-            <div @click="$emit('trigger-login')" class="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl flex items-center gap-3 cursor-pointer transition">
-              <Lock :size="20" class="flex-shrink-0 text-amber-700" />
-              <p class="text-sm font-bold">Zaloguj się, aby zobaczyć dane kontaktowe.</p>
+            <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-900 text-xs font-bold text-center">
+              Zaloguj się, aby złożyć rezerwację.
             </div>
           </template>
         </div>
+
       </div>
     </div>
   </div>
-  
-  <ImageLightbox :url="zoomedImage" @close="zoomedImage = null" />
 </template>
 
 <script setup>
-import { ZoomIn, X, Camera, MapPin, ChevronRight, Phone, MessageSquare, Lock } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Ban } from 'lucide-vue-next'
+import { useRentals } from '@/composables/useRentals'
 
-const props = defineProps(['item', 'isLoggedIn', 'distanceText'])
-const emit = defineEmits(['close', 'trigger-login', 'start-chat'])
-const client = useSupabaseClient()
+const props = defineProps({
+  item: Object,
+  isLoggedIn: Boolean
+})
+
+const emit = defineEmits(['close', 'start-chat'])
 const router = useRouter()
-const zoomedImage = ref(null)
+const client = useSupabaseClient()
+
+// Wyciągamy całą logikę biznesową rezerwacji z composable!
+const { acceptedRanges, fetchAcceptedRanges, requestRental } = useRentals()
+
+const isSubmitting = ref(false)
+const startDate = ref('')
+const endDate = ref('')
+const currentUserId = ref(null)
+
+const todayString = computed(() => new Date().toISOString().split('T')[0])
+
+onMounted(async () => {
+  const { data: { session } } = await client.auth.getSession()
+  if (session?.user) {
+    currentUserId.value = session.user.id
+  }
+})
+
+// Kiedy zmienia się wybrany przedmiot w modalu, pobieramy jego zajęte terminy
+watch(() => props.item, async (newItem) => {
+  if (newItem?.id) {
+    await fetchAcceptedRanges(newItem.id)
+    startDate.value = ''
+    endDate.value = ''
+  }
+}, { immediate: true })
 
 function getImageUrl(path) {
   const { data } = client.storage.from('items').getPublicUrl(path)
   return data.publicUrl
 }
 
-function navigateToProfile() {  
-  if (!props.item?.user_id) {
-    alert("Ten przedmiot NIE MA przypisanego user_id w bazie!")
-    return
+function goToFullDetails() {
+  if (props.item?.id) {
+    emit('close')
+    router.push(`/items/${props.item.id}`)
   }
-  emit('close')
-  router.push(`/profile/${props.item.user_id}`)
+}
+
+async function handleModalRequestRental() {
+  if (!currentUserId.value) return
+  isSubmitting.value = true
+  try {
+    await requestRental(props.item.id, currentUserId.value, startDate.value, endDate.value)
+    alert("Wysłano prośbę o rezerwację!")
+    startDate.value = ''
+    endDate.value = ''
+    await fetchAcceptedRanges(props.item.id)
+  } catch (err) {
+    alert("Błąd: " + err.message)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
-
 <style scoped>
-.animate-slide-up { animation: slideUp 0.25s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
