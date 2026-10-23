@@ -110,7 +110,7 @@ export function useItems() {
       alert('Wystąpił błąd podczas wyszukiwania lokalizacji.')
     }
   }
-  // composables/useItems.js (dopisz tę funkcję do pliku)
+
 async function fetchItemSingle(itemId) {
   try {
     const { data, error } = await client

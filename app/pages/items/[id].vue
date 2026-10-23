@@ -159,7 +159,7 @@
                 class="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-extrabold py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition shadow-lg shadow-amber-500/20 text-sm cursor-pointer"
               >
                 <CalendarCheck :size="18" />
-                <span>{{ isSubmitting ? 'Wysyłanie prośby...' : '📅 Wyślij prośbę o rezerwację' }}</span>
+                <span>{{ isSubmitting ? 'Wysyłanie prośby...' : 'Wyślij prośbę o rezerwację' }}</span>
               </button>
 
               <div class="space-y-2 pt-2 border-t border-slate-100">
@@ -168,7 +168,7 @@
                   @click="openChat"
                   class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition text-sm cursor-pointer shadow-sm mb-2"
                 >
-                  💬 Napisz wiadomość do właściciela
+                  Napisz wiadomość do właściciela
                 </button>
 
                 <a 

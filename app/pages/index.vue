@@ -1,74 +1,97 @@
 <template>
   <div v-if="user || isGuestMode" class="h-screen w-full flex flex-col bg-slate-50 overflow-hidden font-sans relative">
     
-    <header class="h-16 bg-white border-b px-4 md:px-6 flex items-center justify-between z-30 shadow-sm flex-shrink-0 relative">
-      <div class="flex items-center gap-2 mx-auto md:mx-0 font-bold text-lg md:text-xl tracking-tight text-slate-800">
-        <div class="bg-green-600 p-1.5 rounded-lg text-white text-sm md:text-base"><Hammer :size="18" /></div>
+    <!-- Pasek górny (Header) -->
+    <header class="h-16 bg-white border-b border-slate-200/80 px-4 md:px-6 flex items-center justify-between z-30 shadow-xs flex-shrink-0 relative">
+      <div class="flex items-center gap-2.5 font-black text-lg md:text-xl tracking-tight text-slate-800">
+        <div class="bg-green-600 p-2 rounded-xl text-white shadow-sm flex items-center justify-center">
+          <Hammer :size="18" />
+        </div>
         <span>Sąsiedzka Pożyczalnia</span>
       </div>
       
-      <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
-        <span v-if="user" class="text-xs text-slate-400 font-normal">Zalogowany jako: {{ user?.email }}</span>
+      <nav class="hidden md:flex items-center gap-3 text-xs font-bold text-slate-700">
+        <div v-if="user" class="hidden lg:flex items-center gap-2 mr-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-slate-500 font-medium text-xs">
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <span class="truncate max-w-[180px]">{{ user?.email }}</span>
+        </div>
 
-        <button v-if="user" @click="checkProfileBeforeAdding" 
-          :class="isPlacingMode ? 'bg-amber-500 text-white border-amber-500 scale-105' : 'bg-white text-green-600 border-green-600 hover:bg-green-50'"
-          class="px-4 py-2 rounded-xl text-xs font-bold border shadow-sm transition-all duration-200 cursor-pointer"
+        <button 
+          v-if="user" 
+          @click="checkProfileBeforeAdding" 
+          :class="isPlacingMode 
+            ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-500/20' 
+            : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-sm shadow-green-600/20'"
+          class="h-9 px-4 rounded-xl font-bold border transition-all duration-200 cursor-pointer flex items-center gap-2 active:scale-95"
         >
-          {{ isPlacingMode ? '📍 Wybierz miejsce...' : '＋ Dodaj przedmiot' }}
+          <Plus :size="16" />
+          <span>{{ isPlacingMode ? '📍 Wybierz miejsce...' : 'Dodaj przedmiot' }}</span>
         </button>
 
         <template v-if="user">
-          <button @click="showChat = true" class="relative hover:text-green-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 transition cursor-pointer">
-            <MessageSquare :size="14" /> Wiadomości
-            <span v-if="totalUnread > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{{ totalUnread }}</span>
+          <button @click="showChat = true" class="h-9 relative hover:text-green-600 flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3.5 rounded-xl border border-slate-200/70 transition cursor-pointer active:scale-95">
+            <MessageSquare :size="16" class="text-slate-500" />
+            <span>Wiadomości</span>
+            <span v-if="totalUnread > 0" class="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold shadow-xs">
+              {{ totalUnread }}
+            </span>
           </button>
-          <button @click="showDashboard = true" class="hover:text-green-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 hover:border-green-200 transition cursor-pointer"><User :size="14" /> Mój Panel</button>
-          <button @click="logout" class="text-red-500 hover:text-red-700 font-medium text-xs border border-red-100 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 transition cursor-pointer"><LogOut :size="14" /> Wyloguj się</button>
+          <button @click="showDashboard = true" class="h-9 hover:text-green-600 flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3.5 rounded-xl border border-slate-200/70 transition cursor-pointer active:scale-95">
+            <User :size="16" class="text-slate-500" />
+            <span>Mój Panel</span>
+          </button>
+          <button @click="logout" class="h-9 text-red-600 hover:text-red-700 hover:bg-red-100/80 border border-red-200/70 px-3.5 rounded-xl bg-red-50 transition cursor-pointer flex items-center gap-1.5 font-bold active:scale-95 ml-1">
+            <LogOut :size="15" />
+            <span>Wyloguj</span>
+          </button>
         </template>
-        <button v-else @click="isGuestMode = false" class="bg-green-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-green-700 transition cursor-pointer"><LogIn :size="14" /> Zaloguj się</button>
+
+        <button v-else @click="isGuestMode = false" class="h-9 bg-green-600 hover:bg-green-700 text-white px-4 rounded-xl font-bold transition cursor-pointer flex items-center gap-2 shadow-sm">
+          <LogIn :size="16" />
+          <span>Zaloguj się</span>
+        </button>
       </nav>
     </header>
 
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-      <main class="w-full h-[40vh] md:h-full md:flex-1 relative z-0 border-b md:border-b-0 md:border-r border-slate-200">
+    <!-- Główna treść strony -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative pb-16 md:pb-0">
+      <main class="w-full h-[40vh] md:h-full md:flex-1 relative z-0 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col">
         
-        <!-- WYSZUKIWARKA ADRESÓW -->
-        <div class="absolute top-4 left-4 right-4 md:left-16 md:right-auto md:w-80 z-[1000] flex gap-2">
-          <div class="relative flex-1 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200 flex items-center px-3 py-2">
-            <Search class="text-slate-400 mr-2 flex-shrink-0" :size="16" />
-            <input 
-              v-model="addressQuery" 
-              @keyup.enter="searchLocationByAddress"
-              type="text" 
-              placeholder="Wpisz miejscowość lub adres..." 
-              class="w-full bg-transparent border-none text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
-            />
-            <button v-if="addressQuery" @click="addressQuery = ''" class="text-slate-400 hover:text-slate-600 text-xs px-1">✕</button>
-          </div>
-          <button @click="searchLocationByAddress" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded-2xl text-xs font-bold shadow-lg transition flex items-center justify-center flex-shrink-0 cursor-pointer">
-            Szukaj
-          </button>
-        </div>
-
-        <div v-if="isPlacingMode" class="absolute top-20 left-1/2 -translate-x-1/2 z-[1001] bg-slate-900/95 text-white px-3 py-1.5 md:px-5 md:py-2.5 rounded-xl md:rounded-2xl shadow-lg border border-amber-500/30 flex items-center gap-2 md:gap-3 backdrop-blur-sm text-[11px] md:text-sm font-semibold">
+        <!-- Komunikat trybu wyboru miejsca -->
+        <div v-if="isPlacingMode" class="absolute top-20 left-1/2 -translate-x-1/2 z-[1001] bg-slate-900/95 text-white px-5 py-2.5 rounded-2xl shadow-lg border border-amber-500/30 flex items-center gap-3 backdrop-blur-sm text-xs md:text-sm font-semibold">
           <span>📍</span>
           <span>Kliknij na mapie miejsce dodania</span>
-          <button @click.stop="isPlacingMode = false" class="ml-1 bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded-md text-[9px] text-slate-400 font-normal cursor-pointer">Anuluj</button>
+          <button @click.stop="isPlacingMode = false" class="ml-1 bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-md text-xs text-slate-400 font-normal cursor-pointer">Anuluj</button>
         </div>
 
-        <ClientOnly>
-          <TheMap :items="filteredItems" :center="mapCenter" :isPlacingMode="isPlacingMode" @map-click="handleMapClick" @marker-click="openItemDetails" />
-        </ClientOnly>
+        <!-- Mapa z wbudowaną wyszukiwarką w lewym górnym rogu -->
+        <div class="flex-1 relative w-full h-full">
+          <ClientOnly>
+            <TheMap 
+              :items="filteredItems" 
+              :center="mapCenter" 
+              :searchedLocation="searchedLocation"
+              :isPlacingMode="isPlacingMode" 
+              @map-click="handleMapClick" 
+              @marker-click="openItemDetails" 
+            />
+          </ClientOnly>
 
-        <div @click="goToMyLocation" class="absolute bottom-4 left-4 z-[1000] bg-white px-3 py-1.5 rounded-xl shadow-md border border-green-500/20 flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition active:scale-95 select-none">
-          <div class="relative flex h-2 w-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          <!-- Wyszukiwarka adresów nałożona na mapę -->
+          <AddressSearch @location-selected="handleLocationSelected" />
+
+          <!-- Przycisk powrotu do lokalizacji GPS -->
+          <div @click="goToMyLocation" class="absolute bottom-4 left-4 z-[1000] bg-white px-3.5 py-2 rounded-xl shadow-md border border-green-500/20 flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition active:scale-95 select-none">
+            <div class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+            </div>
+            <span class="text-xs font-bold text-slate-700">Twoja lokalizacja</span>
           </div>
-          <span class="text-[11px] font-bold text-slate-700">Twoja lokalizacja</span>
         </div>
       </main>
 
+      <!-- Panel boczny z listą -->
       <aside class="w-full flex-1 md:flex-none md:w-96 bg-white flex flex-col overflow-hidden shadow-inner md:shadow-xl z-10 relative">
         <div class="p-4 border-b bg-white flex-shrink-0">
           <h2 class="font-bold text-base text-slate-800 hidden md:block">Narzędzia w okolicy</h2>
@@ -87,7 +110,7 @@
           </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-20 md:pb-4 bg-slate-50/50">
+        <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-24 md:pb-4 bg-slate-50/50">
           <div v-if="loadingItems && (!items || items.length === 0)" class="text-center py-8 flex flex-col items-center gap-2 text-slate-400 text-sm">
             <div class="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
             <p>Wczytywanie ogłoszeń...</p>
@@ -115,7 +138,40 @@
       </aside>
     </div>
 
-    <!-- Modale i okna -->
+    <!-- Dolna nawigacja mobilna -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around z-40 px-2 shadow-lg">
+      <template v-if="user">
+        <button @click="checkProfileBeforeAdding" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition">
+          <Plus :size="20" />
+          <span class="text-[10px] font-bold mt-0.5">Dodaj</span>
+        </button>
+
+        <button @click="showChat = true" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition relative">
+          <MessageSquare :size="20" />
+          <span class="text-[10px] font-bold mt-0.5">Czat</span>
+          <span v-if="totalUnread > 0" class="absolute top-0 right-2 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{{ totalUnread }}</span>
+        </button>
+
+        <button @click="showDashboard = true" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition">
+          <User :size="20" />
+          <span class="text-[10px] font-bold mt-0.5">Mój Panel</span>
+        </button>
+
+        <button @click="logout" class="flex flex-col items-center justify-center text-red-500 transition">
+          <LogOut :size="20" />
+          <span class="text-[10px] font-bold mt-0.5">Wyloguj</span>
+        </button>
+      </template>
+
+      <template v-else>
+        <button @click="isGuestMode = false" class="w-full bg-green-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm">
+          <LogIn :size="16" />
+          <span>Zaloguj się, aby uzyskać pełen dostęp</span>
+        </button>
+      </template>
+    </nav>
+
+    <!-- Modale -->
     <ItemDetailsModal :item="selectedItem" :isLoggedIn="!!user" :distanceText="selectedItem ? formatDistance(selectedItem) : ''" @close="closeItemDetails" @trigger-login="selectedItem = null; isGuestMode = false;" @start-chat="openChatForItem" />
     <ProfileSetupModal v-if="showProfileForm && user" :userId="user.id" :userEmail="user.email || ''" :initialData="profileData" @close="showProfileForm = false" @success="showProfileForm = false; isPlacingMode = true; loadItems();" />
     <AddItemModal v-if="showModal && user && activeCoords" :coords="activeCoords" :userId="user.id" @close="showModal = false" @saved="showModal = false; activeCoords = null; loadItems();" />
@@ -135,34 +191,31 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
-import { Hammer, User, LogOut, LogIn, Search, Filter, MessageSquare } from 'lucide-vue-next'
+import { Hammer, User, LogOut, LogIn, Search, Filter, MessageSquare, Plus } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useChat } from '@/composables/useChat'
+import AddressSearch from '@/components/AddressSearch.vue'
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const route = useRoute()
 const router = useRouter()
 
-// 1. Logika przedmiotów z composable
 const {
   loadingItems,
   items,
   mapCenter,
   searchQuery,
   selectedCategory,
-  addressQuery,
   filteredItems,
   loadItems,
   formatDistance,
   initAutomaticLocation,
   goToMyLocation,
-  searchLocationByAddress,
   getImageUrl
 } = useItems()
 
-// 2. Logika chatu z composable
 const {
   conversationsList,
   showChat,
@@ -182,6 +235,7 @@ const showProfileForm = ref(false)
 const profileData = ref({ name: '', surname: '', phone: '' })
 const selectedItem = ref(null)
 const chatWindowRef = ref(null)
+const searchedLocation = ref(null)
 
 const categories = ['Elektronika', 'Ogród', 'Budowlane', 'AGD', 'Sport', 'Inne']
 let authSubscription
@@ -193,6 +247,11 @@ const myItemsOnlyForUser = computed(() => {
   if (!items.value || !currentUserId) return []
   return items.value.filter(item => String(item.user_id).trim() === String(currentUserId).trim())
 })
+
+// Przekazanie wybranego adresu – aktualizujemy tylko searchedLocation
+function handleLocationSelected(location) {
+  searchedLocation.value = { lat: location.lat, lng: location.lng }
+}
 
 async function refreshEverything() {
   if (isRefreshing.value) return
