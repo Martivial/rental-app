@@ -44,7 +44,7 @@
       <!-- Treść zakładek -->
       <div class="flex-1 overflow-y-auto p-6 bg-slate-50/30">
         
-        <!-- ZAKŁADKA 1: MOJE OGŁOSZENIA -->
+        <!-- ZAKŁADKA 1: MOJE OGŁOSZENIA Z PRZYCISKIEM ZOBACZ -->
         <div v-if="activeTab === 'items'" class="space-y-3">
           <div v-if="loadingItems" class="text-center py-8 text-slate-400 text-sm flex flex-col items-center gap-2">
             <div class="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
@@ -59,17 +59,20 @@
             <div 
               v-for="item in localMyItems" 
               :key="item.id" 
-              class="bg-white border border-slate-150 rounded-xl p-4 shadow-sm flex items-center justify-between gap-4"
+              class="bg-white border border-slate-150 rounded-xl p-4 shadow-sm flex items-center justify-between gap-4 hover:border-green-500/30 transition"
             >
-              <div class="min-w-0">
-                <h3 class="font-bold text-sm text-slate-800 truncate">{{ item.name }}</h3>
+              <div class="min-w-0 cursor-pointer flex-1" @click="viewItem(item)">
+                <h3 class="font-bold text-sm text-slate-800 truncate hover:text-green-600 transition">{{ item.name }}</h3>
                 <p v-if="item.category" class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold inline-block mt-1 uppercase tracking-wider">{{ item.category }}</p>
               </div>
-              <div class="flex gap-2">
-                <button @click="editingItem = item" class="text-xs font-bold text-blue-500 hover:bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 transition flex-shrink-0 cursor-pointer flex items-center gap-1">
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button @click="viewItem(item)" class="text-xs font-bold text-slate-600 hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 transition cursor-pointer flex items-center gap-1">
+                  <Eye :size="14" /> Zobacz
+                </button>
+                <button @click="editingItem = item" class="text-xs font-bold text-blue-500 hover:bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 transition cursor-pointer flex items-center gap-1">
                   <Edit3 :size="14" /> Edytuj
                 </button>
-                <button @click="handleDeleteItem(item)" class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition flex-shrink-0 cursor-pointer flex items-center gap-1">
+                <button @click="handleDeleteItem(item)" class="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl border border-red-100 transition cursor-pointer flex items-center gap-1">
                   <Trash2 :size="14" /> Usuń
                 </button>
               </div>
@@ -99,10 +102,10 @@
                   </span>
                   <h4 class="font-bold text-sm text-slate-800 mt-1">Przedmiot: {{ rental.items?.name }}</h4>
                   <p class="text-xs text-slate-500 mt-0.5">Wypożyczający: <span class="font-semibold text-slate-700">{{ rental.borrower?.name }} {{ rental.borrower?.surname }}</span></p>
-                <p class="text-xs text-slate-600 mt-1 flex items-center gap-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <span>Termin:</span> 
-               <span class="font-bold text-slate-800">{{ rental.start_date }} do {{ rental.end_date }}</span>
-                </p>
+                  <p class="text-xs text-slate-600 mt-1 flex items-center gap-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span>Termin:</span> 
+                    <span class="font-bold text-slate-800">{{ rental.start_date }} do {{ rental.end_date }}</span>
+                  </p>
                 </div>
 
                 <div v-if="rental.status === 'pending'" class="flex gap-2 pt-2 border-t border-slate-100">
@@ -138,49 +141,21 @@
                   </span>
                   <h4 class="font-bold text-sm text-slate-800 mt-1">{{ rental.items?.name }}</h4>
                   <p class="text-xs text-slate-500 mt-0.5">Właściciel: <span class="font-semibold text-slate-700">{{ rental.items?.profiles?.name }}</span></p>
-                <p class="text-xs text-slate-600 mt-1 flex items-center gap-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
-                 <span>Termin:</span> 
-                <span class="font-bold text-slate-800">{{ rental.start_date }} do {{ rental.end_date }}</span>
-                </p>
+                  <p class="text-xs text-slate-600 mt-1 flex items-center gap-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span>Termin:</span> 
+                    <span class="font-bold text-slate-800">{{ rental.start_date }} do {{ rental.end_date }}</span>
+                  </p>
                 </div>
               </div>
             </div>
           </template>
         </div>
 
-        <!-- ZAKŁADKA 3: PROFIL -->
-        <div v-if="activeTab === 'account'" class="space-y-4">
-          <div v-if="loadingProfile" class="text-center py-8 text-slate-400 text-sm flex flex-col items-center gap-2">
-            <div class="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-            <span>Wczytywanie danych konta...</span>
-          </div>
-
-          <template v-else>
-            <div class="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm space-y-4">
-              <div>
-                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Imię</label>
-                <input v-model="profileData.name" placeholder="np. Jan" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
-              </div>
-              <div>
-                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nazwisko</label>
-                <input v-model="profileData.surname" placeholder="np. Kowalski" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium" />
-              </div>
-              <div>
-                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Numer telefonu</label>
-                <input v-model="profileData.phone" type="tel" placeholder="np. 500 600 700" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold text-slate-700 tracking-wide" />
-              </div>
-            </div>
-
-            <button @click="handleUpdateProfile" :disabled="isSaving" class="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm cursor-pointer">
-              <Save :size="16" />
-              <span>{{ isSaving ? 'Zapisywanie zmian...' : 'Zapisz aktualne dane' }}</span>
-            </button>
-            
-            <p v-if="saveSuccess" class="text-center text-xs text-green-600 font-semibold animate-pulse">
-              Dane konta zostały pomyślnie zaktualizowane!
-            </p>
-          </template>
+        <!-- ZAKŁADKA 3: PROFIL (Wydzielona do UserAccountTab.vue) -->
+        <div v-if="activeTab === 'account'">
+          <UserAccountTab :userId="currentUserId" @profile-updated="$emit('profile-updated')" />
         </div>
+
       </div>
     </div>
 
@@ -195,19 +170,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { X, Package, CalendarCheck, User, Edit3, Trash2, Check, XCircle, Save } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { X, Package, CalendarCheck, User, Edit3, Trash2, Check, XCircle, Eye } from 'lucide-vue-next'
 import { useRentals } from '@/composables/useRentals'
 import { useItems } from '@/composables/useItems'
-import { useProfile } from '@/composables/useProfile'
+import UserAccountTab from '@/components/UserAccountTab.vue'
 
 const emit = defineEmits(['close', 'profile-updated'])
 const client = useSupabaseClient()
+const router = useRouter()
 
 const activeTab = ref('items')
 const editingItem = ref(null)
 const currentUserId = ref(null)
 
-// Podpinamy nasze niezależne composables
 const { 
   loadingRentals, incomingRentals, myRentals, 
   pendingRequestsCount, fetchRentals, updateRentalStatus,
@@ -218,9 +194,10 @@ const {
   loadingItems, localMyItems, fetchUserItems, deleteItem 
 } = useItems()
 
-const { 
-  loadingProfile, isSaving, saveSuccess, profileData, fetchUserProfile, updateProfile 
-} = useProfile()
+function viewItem(item) {
+  emit('close')
+  router.push(`/items/${item.id}`)
+}
 
 async function initializeDashboard() {
   try {
@@ -228,7 +205,6 @@ async function initializeDashboard() {
     if (session?.user?.id) {
       currentUserId.value = session.user.id
       await Promise.all([
-        fetchUserProfile(session.user.id),
         fetchUserItems(session.user.id),
         fetchRentals(session.user.id)
       ])
@@ -241,12 +217,6 @@ async function initializeDashboard() {
 async function handleDeleteItem(item) {
   await deleteItem(item, () => {
     fetchRentals(currentUserId.value)
-  })
-}
-
-async function handleUpdateProfile() {
-  await updateProfile(currentUserId.value, () => {
-    emit('profile-updated')
   })
 }
 

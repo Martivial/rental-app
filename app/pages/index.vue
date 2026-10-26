@@ -29,17 +29,27 @@
         </button>
 
         <template v-if="user">
+          <!-- Przycisk Wiadomości z animowanym badge -->
           <button @click="showChat = true" class="h-9 relative hover:text-green-600 flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3.5 rounded-xl border border-slate-200/70 transition cursor-pointer active:scale-95">
             <MessageSquare :size="16" class="text-slate-500" />
             <span>Wiadomości</span>
-            <span v-if="totalUnread > 0" class="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold shadow-xs">
+            <span v-if="totalUnread > 0" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md animate-bounce">
               {{ totalUnread }}
             </span>
           </button>
-          <button @click="showDashboard = true" class="h-9 hover:text-green-600 flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3.5 rounded-xl border border-slate-200/70 transition cursor-pointer active:scale-95">
+
+          <!-- Przycisk Mój Panel z animowanym badge -->
+          <button 
+            @click="showDashboard = true" 
+            class="h-9 relative hover:text-green-600 flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3.5 rounded-xl border border-slate-200/70 transition cursor-pointer active:scale-95"
+          >
             <User :size="16" class="text-slate-500" />
             <span>Mój Panel</span>
+            <span v-if="pendingRequestsCount > 0" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md animate-bounce">
+              {{ pendingRequestsCount }}
+            </span>
           </button>
+
           <button @click="logout" class="h-9 text-red-600 hover:text-red-700 hover:bg-red-100/80 border border-red-200/70 px-3.5 rounded-xl bg-red-50 transition cursor-pointer flex items-center gap-1.5 font-bold active:scale-95 ml-1">
             <LogOut :size="15" />
             <span>Wyloguj</span>
@@ -57,14 +67,12 @@
     <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative pb-16 md:pb-0">
       <main class="w-full h-[40vh] md:h-full md:flex-1 relative z-0 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col">
         
-        <!-- Komunikat trybu wyboru miejsca -->
         <div v-if="isPlacingMode" class="absolute top-20 left-1/2 -translate-x-1/2 z-[1001] bg-slate-900/95 text-white px-5 py-2.5 rounded-2xl shadow-lg border border-amber-500/30 flex items-center gap-3 backdrop-blur-sm text-xs md:text-sm font-semibold">
           <span>📍</span>
           <span>Kliknij na mapie miejsce dodania</span>
           <button @click.stop="isPlacingMode = false" class="ml-1 bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-md text-xs text-slate-400 font-normal cursor-pointer">Anuluj</button>
         </div>
 
-        <!-- Mapa z wbudowaną wyszukiwarką w lewym górnym rogu -->
         <div class="flex-1 relative w-full h-full">
           <ClientOnly>
             <TheMap 
@@ -77,10 +85,8 @@
             />
           </ClientOnly>
 
-          <!-- Wyszukiwarka adresów nałożona na mapę -->
           <AddressSearch @location-selected="handleLocationSelected" />
 
-          <!-- Przycisk powrotu do lokalizacji GPS -->
           <div @click="goToMyLocation" class="absolute bottom-4 left-4 z-[1000] bg-white px-3.5 py-2 rounded-xl shadow-md border border-green-500/20 flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition active:scale-95 select-none">
             <div class="relative flex h-2.5 w-2.5">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -149,12 +155,15 @@
         <button @click="showChat = true" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition relative">
           <MessageSquare :size="20" />
           <span class="text-[10px] font-bold mt-0.5">Czat</span>
-          <span v-if="totalUnread > 0" class="absolute top-0 right-2 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{{ totalUnread }}</span>
+          <span v-if="totalUnread > 0" class="absolute top-0 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold animate-bounce">{{ totalUnread }}</span>
         </button>
 
-        <button @click="showDashboard = true" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition">
+        <button @click="showDashboard = true" class="flex flex-col items-center justify-center text-slate-600 hover:text-green-600 transition relative">
           <User :size="20" />
           <span class="text-[10px] font-bold mt-0.5">Mój Panel</span>
+          <span v-if="pendingRequestsCount > 0" class="absolute top-0 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold animate-bounce">
+            {{ pendingRequestsCount }}
+          </span>
         </button>
 
         <button @click="logout" class="flex flex-col items-center justify-center text-red-500 transition">
@@ -195,6 +204,7 @@ import { Hammer, User, LogOut, LogIn, Search, Filter, MessageSquare, Plus } from
 import { useRoute, useRouter } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useChat } from '@/composables/useChat'
+import { useRentals } from '@/composables/useRentals'
 import AddressSearch from '@/components/AddressSearch.vue'
 
 const client = useSupabaseClient()
@@ -226,6 +236,8 @@ const {
   cleanupChat
 } = useChat()
 
+const { pendingRequestsCount, fetchRentals } = useRentals()
+
 const showDashboard = ref(false)
 const showModal = ref(false)
 const isGuestMode = ref(true)
@@ -248,7 +260,6 @@ const myItemsOnlyForUser = computed(() => {
   return items.value.filter(item => String(item.user_id).trim() === String(currentUserId).trim())
 })
 
-// Przekazanie wybranego adresu – aktualizujemy tylko searchedLocation
 function handleLocationSelected(location) {
   searchedLocation.value = { lat: location.lat, lng: location.lng }
 }
@@ -269,7 +280,11 @@ async function refreshEverything() {
       return
     }
 
-    await loadConversations(session.user.id)
+    await Promise.all([
+      loadConversations(session.user.id),
+      fetchRentals(session.user.id)
+    ])
+    
     initGlobalNotifications(session.user.id)
   } catch (err) {
     console.error('Błąd refreshEverything:', err)
