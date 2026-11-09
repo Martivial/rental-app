@@ -6,8 +6,7 @@
         <h2 class="text-lg md:text-xl font-bold">Uzupełnij profil</h2>
       </div>
       <p class="text-xs text-slate-500 mb-4 leading-relaxed">
-        Zanim dodasz pierwsze ogłoszenie, podaj swoje dane. Sąsiedzi potrzebują ich, aby wiedzieć, od kogo pożyczają i jak się skontaktować.
-      </p>
+        Zanim wyślesz wiadomość lub złożysz prośbę, podaj swoje dane. Inni użytkownicy potrzebują ich, aby wiedzieć, od kogo pożyczają i jak się z Tobą skontaktować.</p>
       
       <div class="space-y-3">
         <div>

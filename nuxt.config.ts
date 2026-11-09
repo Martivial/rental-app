@@ -31,7 +31,7 @@ export default defineNuxtConfig({
       navigateFallback: '/'
     },
     devOptions: {
-      enabled: false // Pozwala testować PWA na localhost
+      enabled: true
     }
   },
   

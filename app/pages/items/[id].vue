@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-50 pb-12">
+  <div class="min-h-screen bg-slate-50 pb-12 relative">
     
     <!-- Pasek nawigacyjny / Powrót -->
     <div class="max-w-6xl mx-auto px-4 py-4">
@@ -153,8 +153,14 @@
                 </div>
               </div>
 
+              <!-- Komunikat walidacji pod formularzem (zamiast okna alert) -->
+              <div v-if="validationError" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center gap-2">
+                <AlertCircle :size="16" class="text-amber-600 flex-shrink-0" />
+                <span>{{ validationError }}</span>
+              </div>
+
               <button 
-                @click="handleRequestRental" 
+                @click="checkProfileAndProceed('rental')" 
                 :disabled="isSubmitting"
                 class="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-extrabold py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition shadow-lg shadow-amber-500/20 text-sm cursor-pointer"
               >
@@ -165,7 +171,7 @@
               <div class="space-y-2 pt-2 border-t border-slate-100">
                 <!-- Przycisk czatu -->
                 <button 
-                  @click="openChat"
+                  @click="checkProfileAndProceed('chat')"
                   class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition text-sm cursor-pointer shadow-sm mb-2"
                 >
                   Napisz wiadomość do właściciela
@@ -200,6 +206,29 @@
 
     </main>
 
+    <!-- Nowoczesny Komunikat Toast (zamiast alert) -->
+    <Transition name="toast">
+      <div 
+        v-if="toast.visible" 
+        :class="toast.type === 'error' ? 'bg-red-900/90 text-white' : 'bg-slate-900/95 text-white'" 
+        class="fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 border border-white/10 text-sm font-bold"
+      >
+        <CheckCircle2 v-if="toast.type === 'success'" :size="18" class="text-green-400" />
+        <AlertCircle v-else :size="18" class="text-red-400" />
+        <span>{{ toast.message }}</span>
+      </div>
+    </Transition>
+
+    <!-- Modal Uzupełniania Profilu -->
+    <ProfileSetupModal 
+      v-if="showProfileForm && currentUserId" 
+      :userId="currentUserId" 
+      :userEmail="userEmail" 
+      :initialData="profileData" 
+      @close="showProfileForm = false" 
+      @success="handleProfileSuccess" 
+    />
+
     <!-- Lightbox zdjęcia -->
     <div v-if="zoomedImage" @click="zoomedImage = null" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer">
       <img :src="zoomedImage" class="max-w-full max-h-full object-contain rounded-2xl" />
@@ -223,7 +252,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Camera, ZoomIn, Ban, CalendarX, Calendar, CalendarCheck, Phone, ChevronRight } from 'lucide-vue-next'
+import { ArrowLeft, Camera, ZoomIn, Ban, CalendarX, Calendar, CalendarCheck, Phone, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-vue-next'
 import { useItems } from '@/composables/useItems'
 import { useRentals } from '@/composables/useRentals'
 import { useChat } from '@/composables/useChat'
@@ -232,7 +261,6 @@ const route = useRoute()
 const router = useRouter()
 const client = useSupabaseClient()
 
-// Wykorzystujemy dedykowane composables zgodnie z dobrymi praktykami inżynierskimi
 const { fetchItemSingle, getImageUrl } = useItems()
 const { acceptedRanges, fetchAcceptedRanges, requestRental } = useRentals()
 const { showChat, conversationsList, loadConversations, handleMessagesRead } = useChat()
@@ -242,8 +270,27 @@ const loading = ref(true)
 const isSubmitting = ref(false)
 const zoomedImage = ref(null)
 const currentUserId = ref(null)
+const userEmail = ref('')
 const isLoggedIn = ref(false)
 const chatWindowRef = ref(null)
+
+// Komunikat błędu pod polami formularza
+const validationError = ref('')
+
+// Nowoczesny system Toast powiadomień
+const toast = ref({ visible: false, message: '', type: 'success' })
+
+function showToast(message, type = 'success') {
+  toast.value = { visible: true, message, type }
+  setTimeout(() => {
+    toast.value.visible = false
+  }, 4000)
+}
+
+// Stany dla modalu uzupełniania profilu
+const showProfileForm = ref(false)
+const profileData = ref({ name: '', surname: '', phone: '' })
+const pendingAction = ref(null)
 
 const startDate = ref('')
 const endDate = ref('')
@@ -260,6 +307,7 @@ onMounted(async () => {
   if (session?.user) {
     isLoggedIn.value = true
     currentUserId.value = session.user.id
+    userEmail.value = session.user.email || ''
     await loadConversations(currentUserId.value)
   }
 
@@ -270,7 +318,6 @@ async function fetchItemDetails() {
   loading.value = true
   try {
     const itemId = route.params.id
-    // Pobieramy dane przez nasz composable useItems
     item.value = await fetchItemSingle(itemId)
 
     if (item.value?.id) {
@@ -289,29 +336,91 @@ function navigateToProfile() {
   }
 }
 
+// Główna funkcja sprawdzająca profil przed akcją
+async function checkProfileAndProceed(actionType) {
+  validationError.value = ''
+
+  if (!currentUserId.value) {
+    showToast("Musisz się zalogować, aby wykonać tę akcję.", "error")
+    return
+  }
+
+  pendingAction.value = actionType
+
+  try {
+    const { data: profile } = await client.from('profiles').select('name, surname, phone').eq('id', currentUserId.value).maybeSingle()
+    
+    if (profile?.name && profile.surname && profile.phone && profile.phone !== 'EMPTY') {
+      executeAction(actionType)
+    } else {
+      profileData.value = {
+        name: profile?.name || '',
+        surname: profile?.surname || '',
+        phone: (profile?.phone === 'EMPTY' ? '' : profile?.phone) || ''
+      }
+      showProfileForm.value = true
+    }
+  } catch (err) {
+    showProfileForm.value = true
+  }
+}
+
+function handleProfileSuccess() {
+  showProfileForm.value = false
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (action) {
+    executeAction(action)
+  }
+}
+
+function executeAction(actionType) {
+  if (actionType === 'chat') {
+    openChat()
+  } else if (actionType === 'rental') {
+    handleRequestRental()
+  }
+}
+
 async function handleRequestRental() {
+  if (!startDate.value || !endDate.value) {
+    validationError.value = "Wybierz zakres dat rezerwacji w formularzu."
+    return
+  }
+
   isSubmitting.value = true
+  validationError.value = ''
+
   try {
     await requestRental(item.value.id, currentUserId.value, startDate.value, endDate.value)
-    alert("Wysłano prośbę o rezerwację!")
+    showToast("Wysłano prośbę o rezerwację!")
     startDate.value = ''
     endDate.value = ''
     await fetchAcceptedRanges(item.value.id)
   } catch (err) {
-    alert("Błąd: " + err.message)
+    showToast("Błąd wysyłania prośby: " + err.message, "error")
   } finally {
     isSubmitting.value = false
   }
 }
 
 const openChat = () => {
-  if (!currentUserId.value) {
-    alert("Musisz się zalogować, aby napisać wiadomość.")
-    return
-  }
   showChat.value = true
   nextTick(() => {
     chatWindowRef.value?.findOrCreateConversation(item.value)
   })
 }
 </script>
+
+<style scoped>
+/* Animacja pojawiania się powiadomienia Toast */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
